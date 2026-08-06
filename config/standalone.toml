@@ -1,0 +1,6 @@
+[baymax]
+mode = "reachy"
+llm_backend = "mock"
+fallback_llm_backend = "mock"
+asr_backend = "mock"
+tts_backend = "console"

@@ -1,13 +1,5 @@
-# Testing and benchmark protocol
+# Testing
 
-Run `pytest`, `ruff check .`, `mypy baymax_companion`, and `baymax-companion --once hello`. Tests require no robot, Ollama, LiteRT, microphone, or speaker. Hardware and real-model validation remain outstanding.
+Run `python -m pytest`, `python -m ruff check .`, `python -m mypy src/baymax`, `baymax --once hello`, and `baymax doctor`. The suite needs no robot, Ollama, LiteRT, audio device or model download. CI repeats core checks on Windows and Linux with Python 3.10–3.13.
 
-`python scripts/benchmark.py MODEL --label NAME` emits a JSON skeleton for file size, startup/CPU/memory and explicit unmeasured fields. For each compact LiteRT candidate, Qwen 4B Ollama baseline, and optional MedGemma laptop experiment, add measured response latency/tokens per second, GPU telemetry, daemon/audio probes, and battery protocol/result. Never infer null measurements.
-
-## Report template
-
-| Model/artifact | Platform | Size | Startup | Peak RAM | Latency | tok/s | CPU/GPU | Daemon | Audio | Battery |
-|---|---|---:|---:|---:|---:|---:|---|---|---|---|
-| LiteRT compact TBD | Reachy Mini | | | | | | | | | |
-| Qwen 3 4B Ollama | laptop | | | | | | | | | |
-| MedGemma 4B (research) | laptop | | | | | | | | | |
+`python scripts/benchmark_model.py MODEL --label NAME` emits file size, startup/CPU/memory and explicit nulls for unmeasured response, GPU, daemon, audio and battery values. Replace null only with a documented measurement. See `litert-models.md` for the comparison protocol.

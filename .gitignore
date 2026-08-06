@@ -8,3 +8,13 @@ __pycache__/
 data/
 *.sqlite3
 benchmark-results/
+models/
+logs/
+*.tflite
+*.gguf
+*.bin
+*.safetensors
+*.wav
+*.mp3
+*.sqlite
+*.db

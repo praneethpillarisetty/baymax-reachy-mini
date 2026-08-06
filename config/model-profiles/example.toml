@@ -1,0 +1,15 @@
+id = "example-model"
+display_name = "Example model"
+model_path = "../../../models/example/model.tflite"
+tokenizer_path = "../../../models/example/tokenizer"
+runtime = "litert"
+architecture = "unknown"
+quantization = "unknown"
+max_context = 2048
+platform = "linux-arm64-unverified"
+
+[input_signature]
+status = "inspect exact artifact before use"
+
+[output_signature]
+status = "inspect exact artifact before use"

@@ -1,4 +1,4 @@
 #!/usr/bin/env python3
-from baymax_companion.app.main import main
+from baymax.cli import main
 
-main()
+raise SystemExit(main())

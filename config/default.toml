@@ -1,0 +1,13 @@
+[baymax]
+mode = "simulator"
+llm_backend = "mock"
+fallback_llm_backend = "mock"
+asr_backend = "mock"
+tts_backend = "console"
+ollama_url = "http://127.0.0.1:11434"
+ollama_model = "qwen3:4b"
+ollama_timeout = 30
+ollama_retries = 2
+ollama_context_length = 4096
+ollama_temperature = 0.2
+allow_ollama_lan = false
