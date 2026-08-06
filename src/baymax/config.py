@@ -44,7 +44,7 @@ class Settings:
     system_prompt: str = "You are a calm, kind, concise local wellness companion."
 
     @classmethod
-    def from_toml(cls, path: Path | None = None) -> "Settings":
+    def from_toml(cls, path: Path | None = None) -> Settings:
         values: dict[str, Any] = {}
         if path:
             values.update(load_toml(path).get("baymax", {}))
@@ -103,7 +103,7 @@ class Settings:
         return settings
 
     @classmethod
-    def from_env(cls) -> "Settings":
+    def from_env(cls) -> Settings:
         config = os.getenv("BAYMAX_CONFIG")
         return cls.from_toml(Path(config) if config else None)
 

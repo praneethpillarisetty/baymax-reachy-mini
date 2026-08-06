@@ -34,7 +34,7 @@ class LocalStore:
                 "appointments",
                 "wellness_notes",
             ):
-                data[table] = [dict(row) for row in db.execute(f"SELECT * FROM {table}")]  # noqa: S608
+                data[table] = [dict(row) for row in db.execute(f"SELECT * FROM {table}")]
         destination.write_text(json.dumps(data, indent=2))
 
     def delete_all(self) -> None:
@@ -46,7 +46,7 @@ class LocalStore:
                 "appointments",
                 "wellness_notes",
             ):
-                db.execute(f"DELETE FROM {table}")  # noqa: S608
+                db.execute(f"DELETE FROM {table}")
 
     def reminder_definitions(self) -> list[dict[str, Any]]:
         with self.connect() as db:
@@ -62,7 +62,7 @@ class LocalStore:
             completed = reminder.get("completed", 0)
             if not isinstance(title, str) or not title.strip() or not isinstance(due_at, str):
                 raise ValueError("invalid reminder definition")
-            if completed not in {0, 1, False, True}:
+            if completed not in {0, 1}:
                 raise ValueError("invalid reminder completion state")
             validated.append((title[:200], due_at[:100], int(completed)))
         with self.connect() as db:

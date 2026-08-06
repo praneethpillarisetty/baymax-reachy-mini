@@ -6,16 +6,16 @@ import sys
 from pathlib import Path
 
 from .config import Settings
-from .core.transfer import export_profile, import_profile
 from .core.doctor import doctor_exit_code, format_checks, run_doctor
+from .core.transfer import export_profile, import_profile
 from .memory import LocalStore
 from .models.litert import LiteRTModel
 from .models.mock import MockModel
 from .models.ollama import OllamaModel
 from .models.registry import ModelProfileRegistry
 from .orchestrator import ConversationOrchestrator
-from .robot.simulator import SimulatorRobot
 from .robot.reachy_mini import ReachyConnectionError, ReachyMiniRobot
+from .robot.simulator import SimulatorRobot
 from .safety import SafetyEngine
 from .tools import ToolExecutor
 from .voice.tts import ConsoleTTS

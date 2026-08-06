@@ -38,7 +38,7 @@ class LiteRTProfile:
     output_signature: dict[str, Any] | None = None
 
     @classmethod
-    def load(cls, path: Path) -> "LiteRTProfile":
+    def load(cls, path: Path) -> LiteRTProfile:
         try:
             profile = cls(**load_toml(path))
         except (OSError, TOMLDecodeError, TypeError) as exc:

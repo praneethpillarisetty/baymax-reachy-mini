@@ -1,9 +1,14 @@
 from __future__ import annotations
 
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from ..contracts import ActionRequest
 from ..memory import LocalStore
+
+
+class ToolArgumentTypeError(TypeError, ValueError):
+    """Invalid tool argument type, retaining compatibility with existing ValueError handling."""
 
 
 class ToolExecutor:
@@ -102,7 +107,7 @@ class ToolExecutor:
         ):
             raise ValueError("appointment title and when are required")
         if not isinstance(note, str):
-            raise ValueError("appointment note must be text")
+            raise ToolArgumentTypeError("appointment note must be text")
         with self.store.connect() as db:
             db.execute(
                 "INSERT INTO appointments(title,scheduled_at,note) VALUES (?,?,?)",

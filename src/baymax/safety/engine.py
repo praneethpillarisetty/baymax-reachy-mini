@@ -32,12 +32,15 @@ class SafetyEngine:
     )
 
     def check(self, text: str) -> ModelResponse | None:
-        if any(re.search(pattern, text, re.I) for pattern in self._patterns):
+        if any(re.search(pattern, text, re.IGNORECASE) for pattern in self._patterns):
             return ModelResponse(self.emergency_message, emotion="concern")
         return None
 
     def enforce_output(self, response: ModelResponse) -> ModelResponse:
-        if any(re.search(pattern, response.message, re.I) for pattern in self._prohibited_advice):
+        if any(
+            re.search(pattern, response.message, re.IGNORECASE)
+            for pattern in self._prohibited_advice
+        ):
             return ModelResponse(self.limitation_message, emotion="concern")
         return response
 

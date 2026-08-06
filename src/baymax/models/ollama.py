@@ -33,9 +33,9 @@ class OllamaModel:
                 with request.urlopen(req, timeout=self.timeout) as response:
                     value = json.loads(response.read())
                     if not isinstance(value, dict):
-                        raise ValueError("Ollama response is not an object")
+                        raise TypeError("Ollama response is not an object")
                     return value
-            except (error.URLError, TimeoutError, json.JSONDecodeError, ValueError) as exc:
+            except (error.URLError, TimeoutError, json.JSONDecodeError, TypeError) as exc:
                 last_error = exc
                 if attempt < self.retries:
                     time.sleep(min(0.1 * (2**attempt), 1.0))
