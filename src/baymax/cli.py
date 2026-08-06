@@ -18,6 +18,7 @@ from .robot.reachy_mini import ReachyConnectionError, ReachyMiniRobot
 from .robot.simulator import SimulatorRobot
 from .safety import SafetyEngine
 from .tools import ToolExecutor
+from .ui import run_ui
 from .voice.tts import ConsoleTTS
 
 
@@ -95,6 +96,9 @@ def parser() -> argparse.ArgumentParser:
     inspect.add_argument("--profile", type=Path, required=True)
     commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
     commands.add_parser("safe-stop")
+    ui = commands.add_parser("ui")
+    ui.add_argument("--port", type=int, default=8765)
+    ui.add_argument("--no-browser", action="store_true")
     return root
 
 
@@ -193,6 +197,12 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     app = build_app(settings)
     try:
+        if args.command == "ui":
+            if not 0 <= args.port <= 65535:
+                print("UI port must be between 0 and 65535", file=sys.stderr)
+                return 2
+            run_ui(app, args.port, not args.no_browser)
+            return 0
         if args.command == "safe-stop":
             return 0
         if args.once is not None:

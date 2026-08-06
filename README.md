@@ -22,6 +22,7 @@ Configuration is read from `--config FILE` and then overridden by environment va
 * `baymax data export --output data.json`, `baymax data delete --yes` — local-data controls.
 * `baymax export --output profile.zip [--include-reminders]`, `baymax import --input profile.zip --settings-output imported.json` — checksummed versioned transfer with v1 migration.
 * `baymax models list`, `baymax models inspect --profile PROFILE` — registry validation and LiteRT dry-run inspection.
+* `baymax ui` — open a dependency-free local browser interface on `127.0.0.1`.
 * `baymax robot-smoke --confirm-supervised` — deliberately fails closed until the official SDK adapter and hardware connection are validated.
 * `baymax safe-stop` — stop the selected adapter safely.
 
