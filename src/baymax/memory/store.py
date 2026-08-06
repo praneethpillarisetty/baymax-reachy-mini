@@ -54,3 +54,19 @@ class LocalStore:
                 dict(row)
                 for row in db.execute("SELECT title,due_at,completed FROM reminders ORDER BY id")
             ]
+
+    def import_reminder_definitions(self, reminders: tuple[dict[str, Any], ...]) -> int:
+        validated: list[tuple[str, str, int]] = []
+        for reminder in reminders:
+            title, due_at = reminder.get("title"), reminder.get("due_at")
+            completed = reminder.get("completed", 0)
+            if not isinstance(title, str) or not title.strip() or not isinstance(due_at, str):
+                raise ValueError("invalid reminder definition")
+            if completed not in {0, 1, False, True}:
+                raise ValueError("invalid reminder completion state")
+            validated.append((title[:200], due_at[:100], int(completed)))
+        with self.connect() as db:
+            db.executemany(
+                "INSERT INTO reminders(title,due_at,completed) VALUES (?,?,?)", validated
+            )
+        return len(validated)

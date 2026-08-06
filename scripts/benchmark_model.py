@@ -1,39 +1,72 @@
 #!/usr/bin/env python3
+from __future__ import annotations
+
 import argparse
 import json
 import os
-import resource
+import subprocess
 import time
 from pathlib import Path
 
-p = argparse.ArgumentParser()
-p.add_argument("model")
-p.add_argument("--label", required=True)
-p.add_argument("--tokens", type=int)
-a = p.parse_args()
-path = Path(a.model)
-started = time.perf_counter()
-before = resource.getrusage(resource.RUSAGE_SELF)
-size = path.stat().st_size if path.exists() else None
-elapsed = time.perf_counter() - started
-after = resource.getrusage(resource.RUSAGE_SELF)
-print(
-    json.dumps(
-        {
-            "label": a.label,
-            "model_file_bytes": size,
-            "startup_seconds": elapsed,
-            "peak_memory_kb": after.ru_maxrss,
-            "cpu_user_seconds": after.ru_utime - before.ru_utime,
-            "cpu_system_seconds": after.ru_stime - before.ru_stime,
-            "response_latency_seconds": None,
-            "tokens_per_second": None,
-            "gpu_usage": None,
-            "daemon_responsive": None,
-            "audio_responsive": None,
-            "battery_impact": None,
-            "pid": os.getpid(),
-        },
-        indent=2,
+if os.name != "nt":
+    import resource
+
+
+def peak_memory_bytes() -> int | None:
+    if os.name == "nt":
+        return None
+    value = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+    return int(value * (1 if __import__("sys").platform == "darwin" else 1024))
+
+
+def timed(command: list[str]) -> tuple[float, str]:
+    started = time.perf_counter()
+    completed = subprocess.run(command, check=True, capture_output=True, text=True, timeout=600)
+    return time.perf_counter() - started, completed.stdout
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser(description="Benchmark an explicitly installed local model")
+    parser.add_argument("model", type=Path)
+    parser.add_argument("--label", required=True)
+    parser.add_argument(
+        "--tokens", type=int, help="Generated token count from the selected runtime"
     )
-)
+    parser.add_argument("--verified-platform", default="unverified")
+    parser.add_argument(
+        "--probe", nargs=argparse.REMAINDER, help="Optional runtime probe command; run twice"
+    )
+    args = parser.parse_args()
+    if not args.model.is_file():
+        parser.error(f"model file does not exist: {args.model}")
+    startup = latency = tokens_per_second = None
+    output = ""
+    if args.probe:
+        startup, _ = timed(args.probe)
+        latency, output = timed(args.probe)
+        if args.tokens is not None and latency > 0:
+            tokens_per_second = args.tokens / latency
+    report = {
+        "schema_version": 1,
+        "label": args.label,
+        "verified_platform": args.verified_platform,
+        "model_file": str(args.model),
+        "model_file_bytes": args.model.stat().st_size,
+        "startup_seconds": startup,
+        "peak_ram_bytes": peak_memory_bytes(),
+        "response_latency_seconds": latency,
+        "tokens_generated": args.tokens,
+        "tokens_per_second": tokens_per_second,
+        "probe_output_characters": len(output),
+        "cpu_usage": None,
+        "gpu_usage": None,
+        "daemon_responsive": None,
+        "audio_responsive": None,
+        "battery_impact": None,
+    }
+    print(json.dumps(report, indent=2))
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

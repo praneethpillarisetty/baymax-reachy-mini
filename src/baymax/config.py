@@ -9,7 +9,7 @@ from urllib.parse import urlparse
 
 from .core.toml import load_toml
 
-SUPPORTED_MODES = {"simulator", "laptop", "reachy"}
+SUPPORTED_MODES = {"simulator", "laptop", "standalone", "reachy"}
 SUPPORTED_BACKENDS = {"mock", "ollama", "litert"}
 SECRET_MARKERS = ("KEY", "TOKEN", "PASSWORD", "SECRET")
 

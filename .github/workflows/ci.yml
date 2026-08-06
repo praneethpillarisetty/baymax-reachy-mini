@@ -15,3 +15,22 @@ jobs:
       - run: python -m pytest
       - run: python -m ruff check .
       - run: python -m mypy src/baymax
+      - run: python -m build
+      - run: python -m baymax.cli --once "CI simulator smoke test"
+  windows-executable:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.12'}
+      - run: python -m pip install -e ".[test,windows]"
+      - run: python -m PyInstaller --noconfirm --clean deploy/windows/BaymaxCompanion.spec
+      - run: .\dist\BaymaxCompanion.exe --once "packaging smoke test"
+      - run: choco install innosetup --no-progress -y
+      - run: iscc deploy\windows\BaymaxCompanion.iss
+      - uses: actions/upload-artifact@v4
+        with:
+          name: BaymaxCompanion-Windows-console
+          path: |
+            dist/BaymaxCompanion.exe
+            dist/BaymaxCompanion-Setup.exe

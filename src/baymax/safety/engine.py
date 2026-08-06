@@ -40,3 +40,13 @@ class SafetyEngine:
         if any(re.search(pattern, response.message, re.I) for pattern in self._prohibited_advice):
             return ModelResponse(self.limitation_message, emotion="concern")
         return response
+
+    @classmethod
+    def configuration(cls) -> dict[str, object]:
+        return {
+            "schema": 1,
+            "emergency_patterns": list(cls._patterns),
+            "prohibited_advice_patterns": list(cls._prohibited_advice),
+            "emergency_message": cls.emergency_message,
+            "limitation_message": cls.limitation_message,
+        }

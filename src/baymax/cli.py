@@ -2,16 +2,17 @@ from __future__ import annotations
 
 import argparse
 import json
-import shutil
 import sys
 from pathlib import Path
 
 from .config import Settings
 from .core.transfer import export_profile, import_profile
+from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .memory import LocalStore
 from .models.litert import LiteRTModel
 from .models.mock import MockModel
 from .models.ollama import OllamaModel
+from .models.registry import ModelProfileRegistry
 from .orchestrator import ConversationOrchestrator
 from .robot.simulator import SimulatorRobot
 from .safety import SafetyEngine
@@ -63,47 +64,13 @@ def build_app(settings: Settings) -> ConversationOrchestrator:
     )
 
 
-def doctor(settings: Settings) -> int:
-    checks: list[tuple[str, bool, str]] = [
-        ("configuration", True, "valid"),
-        ("platform", True, settings.platform_summary),
-    ]
-    try:
-        LocalStore(settings.database_path)
-        checks.append(("database", True, str(settings.database_path)))
-    except OSError as exc:
-        checks.append(("database", False, str(exc)))
-    if settings.llm_backend == "ollama":
-        model = build_model(settings, "ollama")
-        ok, detail = model.health_check()
-        checks.append(("ollama", ok, detail))
-    else:
-        checks.append(("ollama", True, "not selected"))
-    checks.append(("ollama executable", True, shutil.which("ollama") or "not installed (optional)"))
-    if settings.llm_backend == "litert":
-        assert settings.litert_model_profile is not None
-        try:
-            LiteRTModel(
-                settings.litert_model_profile,
-                dry_run=False,
-                model_path_override=settings.litert_model_path,
-            )
-            checks.append(("litert model", True, "files available"))
-        except Exception as exc:
-            checks.append(("litert model", False, str(exc)))
-    if settings.mode == "reachy":
-        checks.append(("physical robot", False, "not hardware-validated"))
-    for name, ok, detail in checks:
-        print(f"{'PASS' if ok else 'FAIL'} {name}: {detail}")
-    return 0 if all(ok for _, ok, _ in checks) else 1
-
-
 def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="baymax")
     root.add_argument("--config", type=Path)
     root.add_argument("--once")
     commands = root.add_subparsers(dest="command")
-    commands.add_parser("doctor")
+    doctor = commands.add_parser("doctor")
+    doctor.add_argument("--json", action="store_true")
     config = commands.add_parser("config").add_subparsers(dest="config_command", required=True)
     config.add_parser("show")
     config.add_parser("validate")
@@ -118,6 +85,14 @@ def parser() -> argparse.ArgumentParser:
     imp = commands.add_parser("import")
     imp.add_argument("--input", type=Path, required=True)
     imp.add_argument("--profiles-dir", type=Path, default=Path("config/model-profiles"))
+    imp.add_argument("--settings-output", type=Path)
+    imp.add_argument("--import-reminders", action="store_true")
+    models = commands.add_parser("models").add_subparsers(dest="models_command", required=True)
+    model_list = models.add_parser("list")
+    model_list.add_argument("--profiles-dir", type=Path, default=Path("config/model-profiles"))
+    inspect = models.add_parser("inspect")
+    inspect.add_argument("--profile", type=Path, required=True)
+    commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
     commands.add_parser("safe-stop")
     return root
 
@@ -131,7 +106,9 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     store = LocalStore(settings.database_path)
     if args.command == "doctor":
-        return doctor(settings)
+        checks = run_doctor(settings)
+        print(format_checks(checks, args.json))
+        return doctor_exit_code(checks)
     if args.command == "config":
         if args.config_command == "show":
             print(json.dumps(settings.public_dict(), indent=2))
@@ -150,13 +127,64 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "export":
         reminders = store.reminder_definitions() if args.include_reminders else None
         export_profile(
-            args.output, settings.public_dict(), (Path("config/model-profiles"),), reminders
+            args.output,
+            settings.public_dict(),
+            (Path("config/model-profiles"),),
+            reminders,
+            personality={"system_prompt": settings.system_prompt},
+            safety=SafetyEngine.configuration(),
         )
         return 0
     if args.command == "import":
         imported = import_profile(args.input, args.profiles_dir)
-        print(json.dumps(imported, indent=2))
+        if args.settings_output:
+            args.settings_output.parent.mkdir(parents=True, exist_ok=True)
+            args.settings_output.write_text(
+                json.dumps(imported.settings, indent=2), encoding="utf-8"
+            )
+        if args.import_reminders:
+            store.import_reminder_definitions(imported.reminders)
+        print(
+            json.dumps(
+                {
+                    "source_version": imported.source_version,
+                    "settings": imported.settings,
+                    "personality": imported.personality,
+                    "safety": imported.safety,
+                    "reminders_available": len(imported.reminders),
+                },
+                indent=2,
+            )
+        )
         return 0
+    if args.command == "models":
+        if args.models_command == "list":
+            registry = ModelProfileRegistry((args.profiles_dir,))
+            for identifier, (_, profile) in registry.profiles().items():
+                print(f"{identifier}\t{profile.display_name}\t{profile.platform}")
+        else:
+            adapter = LiteRTModel(args.profile, dry_run=True)
+            print(
+                json.dumps(
+                    {
+                        "profile": adapter.profile.id,
+                        "model_path": str(adapter.model_path),
+                        "tokenizer_path": str(adapter.tokenizer_path),
+                        "signatures": adapter.inspect_signatures(),
+                    },
+                    indent=2,
+                )
+            )
+        return 0
+    if args.command == "robot-smoke":
+        if not args.confirm_supervised:
+            print("Refusing hardware smoke test without --confirm-supervised", file=sys.stderr)
+            return 2
+        print(
+            "Physical adapter is fail-closed: official SDK API and hardware connection are not validated.",
+            file=sys.stderr,
+        )
+        return 1
     app = build_app(settings)
     try:
         if args.command == "safe-stop":

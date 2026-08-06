@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "baymax-reachy-mini"
-version = "0.2.0"
+version = "0.3.0"
 description = "Local-first wellness companion shared core and platform adapters"
 readme = "README.md"
 requires-python = ">=3.10,<3.14"
@@ -13,7 +13,7 @@ dependencies = []
 
 [project.optional-dependencies]
 core = []
-test = ["pytest>=8,<9", "ruff>=0.9,<1", "mypy>=1.14,<2"]
+test = ["pytest>=8,<9", "ruff>=0.9,<1", "mypy>=1.14,<2", "build>=1.2,<2"]
 windows = ["pyinstaller>=6.11,<7; platform_system == 'Windows'"]
 ollama = []
 litert = []
@@ -23,6 +23,7 @@ all = [
   "pytest>=8,<9",
   "ruff>=0.9,<1",
   "mypy>=1.14,<2",
+  "build>=1.2,<2",
   "pyinstaller>=6.11,<7; platform_system == 'Windows'",
 ]
 
