@@ -27,6 +27,10 @@ class Settings:
     fallback_llm_backend: str | None = "mock"
     asr_backend: str = "mock"
     tts_backend: str = "console"
+    asr_executable: Path | None = None
+    asr_model_path: Path | None = None
+    tts_executable: Path | None = None
+    tts_model_path: Path | None = None
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:4b"
     ollama_timeout: float = 30.0
@@ -50,6 +54,10 @@ class Settings:
             "fallback_llm_backend": "BAYMAX_FALLBACK_LLM_BACKEND",
             "asr_backend": "BAYMAX_ASR_BACKEND",
             "tts_backend": "BAYMAX_TTS_BACKEND",
+            "asr_executable": "BAYMAX_ASR_EXECUTABLE",
+            "asr_model_path": "BAYMAX_ASR_MODEL_PATH",
+            "tts_executable": "BAYMAX_TTS_EXECUTABLE",
+            "tts_model_path": "BAYMAX_TTS_MODEL_PATH",
             "ollama_url": "OLLAMA_URL",
             "ollama_model": "OLLAMA_MODEL",
             "ollama_timeout": "OLLAMA_TIMEOUT",
@@ -77,7 +85,15 @@ class Settings:
                 "true",
                 "yes",
             }
-        for key in ("litert_model_path", "litert_model_profile", "database_path"):
+        for key in (
+            "asr_executable",
+            "asr_model_path",
+            "tts_executable",
+            "tts_model_path",
+            "litert_model_path",
+            "litert_model_profile",
+            "database_path",
+        ):
             if values.get(key):
                 values[key] = Path(values[key])
             elif key in values:

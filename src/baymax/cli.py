@@ -15,6 +15,7 @@ from .models.ollama import OllamaModel
 from .models.registry import ModelProfileRegistry
 from .orchestrator import ConversationOrchestrator
 from .robot.simulator import SimulatorRobot
+from .robot.reachy_mini import ReachyConnectionError, ReachyMiniRobot
 from .safety import SafetyEngine
 from .tools import ToolExecutor
 from .voice.tts import ConsoleTTS
@@ -180,11 +181,16 @@ def main(argv: list[str] | None = None) -> int:
         if not args.confirm_supervised:
             print("Refusing hardware smoke test without --confirm-supervised", file=sys.stderr)
             return 2
-        print(
-            "Physical adapter is fail-closed: official SDK API and hardware connection are not validated.",
-            file=sys.stderr,
-        )
-        return 1
+        robot = ReachyMiniRobot()
+        try:
+            robot.start()
+        except ReachyConnectionError as exc:
+            print(f"Physical smoke test failed safely: {exc}", file=sys.stderr)
+            return 1
+        finally:
+            robot.shutdown()
+        print("Supervised Reachy Mini connection and safe shutdown passed.")
+        return 0
     app = build_app(settings)
     try:
         if args.command == "safe-stop":

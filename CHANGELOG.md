@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1 - 2026-08-06
+
+- Restored model adapters and the example profile that were accidentally excluded by an over-broad `models/` ignore rule.
+- Added strict Ollama configured-model health checks, Reachy adapter import/smoke gates, and audio artifact diagnostics.
+- Re-recorded the blocked official Reachy documentation verification without introducing guessed hardware APIs.
+
 ## 0.3.0 - 2026-08-06
 
 - Added checksummed portable profile v2 with secret redaction, v1 migration, explicit personality/safety data, optional reminder import, and registry transfer.

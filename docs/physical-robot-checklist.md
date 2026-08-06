@@ -7,6 +7,9 @@
 - [ ] Safe volume and local network firewall confirmed.
 - [ ] Simulator, `baymax doctor`, configuration, model availability, cancellation and shutdown pass.
 - [ ] Physical stop/power-off rehearsed before motor enable.
+- [ ] `ReachyMiniRobot.sdk_available()` is true and the exact installed distribution/version is recorded.
+- [ ] Official generated app files are present under `deploy/reachy-mini/` and reviewed against the current root `AGENTS.md`.
+- [ ] `baymax robot-smoke --confirm-supervised` performs a verified connection test rather than returning the integration gate.
 - [ ] Stop on collision, heat, noise, strain, unexpected motion or daemon loss.
 
 Passing this document does not establish medical-device or physical-hardware validation.

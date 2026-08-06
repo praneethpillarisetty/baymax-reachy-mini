@@ -86,6 +86,19 @@ def test_ollama_timeout():
         model.generate("x", "x")
 
 
+def test_ollama_health_requires_configured_model():
+    model = OllamaModel("http://127.0.0.1:11434", "chosen:1b", 1, 32, 0, retries=0)
+    with patch.object(model, "_request", return_value={"models": [{"name": "other:1b"}]}):
+        available, detail = model.health_check()
+    assert not available
+    assert "not installed" in detail
+
+    with patch.object(model, "_request", return_value={"models": [{"name": "chosen:1b"}]}):
+        available, detail = model.health_check()
+    assert available
+    assert "is installed" in detail
+
+
 def test_reminder_create_failure_and_complete(tmp_path):
     tools = ToolExecutor(LocalStore(tmp_path / "d"))
     assert "created" in tools.execute(

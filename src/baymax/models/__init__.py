@@ -1,0 +1,1 @@
+"""Replaceable local model adapters."""

@@ -56,6 +56,26 @@ def run_doctor(settings: Settings) -> list[Check]:
         ),
         Check("simulator", "pass", "built-in hardware-independent adapter available"),
     ]
+    for kind, backend, executable, model in (
+        ("ASR", settings.asr_backend, settings.asr_executable, settings.asr_model_path),
+        ("TTS", settings.tts_backend, settings.tts_executable, settings.tts_model_path),
+    ):
+        if backend in {"mock", "console"}:
+            checks.append(Check(f"{kind} files", "pass", f"{backend} requires no files"))
+        else:
+            missing = [
+                label
+                for label, path in (("executable", executable), ("model", model))
+                if path is None or not path.exists()
+            ]
+            checks.append(
+                Check(
+                    f"{kind} files",
+                    "fail" if missing else "pass",
+                    "missing " + ", ".join(missing) if missing else "executable and model found",
+                    f"Set BAYMAX_{kind}_EXECUTABLE and BAYMAX_{kind}_MODEL_PATH to verified local files.",
+                )
+            )
     try:
         LocalStore(settings.database_path)
         checks.append(Check("database", "pass", str(settings.database_path)))

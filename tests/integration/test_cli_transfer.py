@@ -93,6 +93,17 @@ def test_doctor_mock(tmp_path, monkeypatch, capsys):
     assert "WARN physical Reachy support" in output
 
 
+def test_doctor_reports_missing_local_audio_files(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "db.sqlite3"))
+    monkeypatch.setenv("BAYMAX_ASR_BACKEND", "local-command")
+    monkeypatch.setenv("BAYMAX_TTS_BACKEND", "local-command")
+    monkeypatch.setattr("baymax.core.doctor.sys.version_info", (3, 12, 0))
+    assert main(["doctor"]) == 1
+    output = capsys.readouterr().out
+    assert "FAIL ASR files: missing executable, model" in output
+    assert "FAIL TTS files: missing executable, model" in output
+
+
 def test_data_delete_requires_confirmation(tmp_path, monkeypatch):
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "db.sqlite3"))
     assert main(["data", "delete"]) == 2

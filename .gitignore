@@ -8,7 +8,7 @@ __pycache__/
 data/
 *.sqlite3
 benchmark-results/
-models/
+/models/
 logs/
 *.tflite
 *.gguf
