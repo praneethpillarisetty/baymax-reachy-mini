@@ -1,0 +1,6 @@
+[baymax]
+mode = "standalone"
+llm_backend = "litert"
+fallback_llm_backend = "mock"
+asr_backend = "mock"
+tts_backend = "console"

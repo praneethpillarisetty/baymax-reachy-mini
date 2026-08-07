@@ -1,0 +1,48 @@
+[build-system]
+requires = ["hatchling>=1.27,<2"]
+build-backend = "hatchling.build"
+
+[project]
+name = "baymax-reachy-mini"
+version = "0.3.1"
+description = "Local-first wellness companion shared core and platform adapters"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+license = {text = "MIT"}
+dependencies = []
+
+[project.optional-dependencies]
+core = []
+test = ["pytest>=8,<9", "ruff>=0.9,<1", "mypy>=1.14,<2", "build>=1.2,<2"]
+windows = ["pyinstaller>=6.11,<7; platform_system == 'Windows'"]
+ollama = []
+litert = []
+reachy = [] # Add only the exact SDK constraint verified against current official docs.
+audio = [] # Select an explicitly tested ASR/TTS implementation; no implicit model downloads.
+all = [
+  "pytest>=8,<9",
+  "ruff>=0.9,<1",
+  "mypy>=1.14,<2",
+  "build>=1.2,<2",
+  "pyinstaller>=6.11,<7; platform_system == 'Windows'",
+]
+
+[project.scripts]
+baymax = "baymax.cli:main"
+baymax-companion = "baymax.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/baymax"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+pythonpath = ["src"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["src/baymax"]
