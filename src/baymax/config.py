@@ -55,6 +55,14 @@ class Settings:
     ollama_context_length: int = 4096
     ollama_temperature: float = 0.2
     allow_ollama_lan: bool = False
+    reachy_supervised: bool = False
+    reachy_checklist_complete: bool = False
+    reachy_connection_mode: str = "local"
+    reachy_host: str | None = None
+    reachy_connection_timeout: float = 5.0
+    reachy_watchdog_timeout: float = 10.0
+    reachy_max_expression_duration: float = 3.0
+    reachy_max_movement: float = 0.25
     litert_model_path: Path | None = None
     litert_tokenizer_path: Path | None = None
     litert_model_profile: Path | None = None
@@ -100,6 +108,14 @@ class Settings:
             "ollama_context_length": "OLLAMA_CONTEXT_LENGTH",
             "ollama_temperature": "OLLAMA_TEMPERATURE",
             "allow_ollama_lan": "BAYMAX_ALLOW_OLLAMA_LAN",
+            "reachy_supervised": "BAYMAX_CONFIRM_SUPERVISED",
+            "reachy_checklist_complete": "BAYMAX_PHYSICAL_CHECKLIST_COMPLETE",
+            "reachy_connection_mode": "BAYMAX_REACHY_CONNECTION_MODE",
+            "reachy_host": "BAYMAX_REACHY_HOST",
+            "reachy_connection_timeout": "BAYMAX_REACHY_CONNECTION_TIMEOUT",
+            "reachy_watchdog_timeout": "BAYMAX_REACHY_WATCHDOG_TIMEOUT",
+            "reachy_max_expression_duration": "BAYMAX_REACHY_MAX_EXPRESSION_DURATION",
+            "reachy_max_movement": "BAYMAX_REACHY_MAX_MOVEMENT",
             "litert_model_path": "LITERT_MODEL_PATH",
             "litert_tokenizer_path": "LITERT_TOKENIZER_PATH",
             "litert_model_profile": "LITERT_MODEL_PROFILE",
@@ -121,18 +137,22 @@ class Settings:
             old = f"BAYMAX_{setting_name.upper()}"
             if setting_name not in values and old in os.environ:
                 values[setting_name] = os.environ[old]
-        for key in ("ollama_timeout", "ollama_temperature"):
+        for key in (
+            "ollama_timeout",
+            "ollama_temperature",
+            "reachy_connection_timeout",
+            "reachy_watchdog_timeout",
+            "reachy_max_expression_duration",
+            "reachy_max_movement",
+        ):
             if key in values:
                 values[key] = float(values[key])
         for key in ("ollama_retries", "ollama_context_length"):
             if key in values:
                 values[key] = int(values[key])
-        if "allow_ollama_lan" in values:
-            values["allow_ollama_lan"] = str(values["allow_ollama_lan"]).lower() in {
-                "1",
-                "true",
-                "yes",
-            }
+        for key in ("allow_ollama_lan", "reachy_supervised", "reachy_checklist_complete"):
+            if key in values:
+                values[key] = str(values[key]).lower() in {"1", "true", "yes"}
         for key in (
             "asr_executable",
             "asr_model_path",
@@ -183,6 +203,19 @@ class Settings:
             errors.append("OLLAMA_URL must be an HTTP(S) URL")
         if parsed.hostname not in {"localhost", "127.0.0.1", "::1"} and not self.allow_ollama_lan:
             errors.append("non-loopback Ollama requires BAYMAX_ALLOW_OLLAMA_LAN=true")
+        if self.reachy_connection_mode not in {"local", "network"}:
+            errors.append("Reachy connection mode must be local or network")
+        if self.reachy_connection_mode == "network" and not self.reachy_host:
+            errors.append("network Reachy mode requires BAYMAX_REACHY_HOST")
+        for label, value in (
+            ("Reachy connection timeout", self.reachy_connection_timeout),
+            ("Reachy watchdog timeout", self.reachy_watchdog_timeout),
+            ("Reachy maximum expression duration", self.reachy_max_expression_duration),
+        ):
+            if value <= 0 or value > 60:
+                errors.append(f"{label} must be greater than 0 and at most 60 seconds")
+        if not 0 <= self.reachy_max_movement <= 1:
+            errors.append("Reachy maximum movement must be between 0 and 1")
         if not 0 <= self.ollama_temperature <= 2:
             errors.append("temperature must be between 0 and 2")
         if errors:
