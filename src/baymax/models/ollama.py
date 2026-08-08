@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import json
 import shutil
-import socket
 import threading
 import time
 from pathlib import Path
@@ -63,13 +62,11 @@ class OllamaModel:
                 raise OllamaConnectionError(
                     f"Ollama returned HTTP {exc.code}; check the model and server logs"
                 ) from exc
-            except (error.URLError, ConnectionError, socket.timeout, TimeoutError) as exc:
+            except (error.URLError, ConnectionError, TimeoutError) as exc:
                 last_error = exc
                 if attempt < self.retries:
                     time.sleep(min(0.1 * (2**attempt), 1.0))
-        detail = (
-            "timed out" if isinstance(last_error, (socket.timeout, TimeoutError)) else "refused"
-        )
+        detail = "timed out" if isinstance(last_error, TimeoutError) else "refused"
         raise OllamaConnectionError(
             f"Ollama connection {detail} at {self.url} after {self.retries + 1} attempt(s); "
             "start `ollama serve` and verify OLLAMA_URL"

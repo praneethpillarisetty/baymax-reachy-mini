@@ -1,6 +1,5 @@
 import io
 import json
-import socket
 from pathlib import Path
 from unittest.mock import patch
 
@@ -32,7 +31,7 @@ def test_malformed_json_is_actionable():
 
 
 def test_timeout_is_actionable():
-    with patch("urllib.request.urlopen", side_effect=socket.timeout()):
+    with patch("urllib.request.urlopen", side_effect=TimeoutError()):
         available, detail = adapter().health_check()
     assert not available
     assert "timed out" in detail

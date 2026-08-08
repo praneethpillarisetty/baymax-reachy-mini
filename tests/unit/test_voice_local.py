@@ -1,6 +1,6 @@
+import wave
 from pathlib import Path
 from unittest.mock import patch
-import wave
 
 from baymax.voice.local import CommandASR, CommandTTS
 
