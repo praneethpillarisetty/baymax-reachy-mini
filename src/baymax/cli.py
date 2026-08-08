@@ -7,6 +7,7 @@ from pathlib import Path
 
 from .config import Settings
 from .core.doctor import doctor_exit_code, format_checks, run_doctor
+from .core.diagnostics import export_diagnostics
 from .core.transfer import export_profile, import_profile
 from .memory import LocalStore
 from .models.capabilities import detect_capabilities, evaluate, recommended_target
@@ -125,7 +126,14 @@ def parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--label", required=True)
     commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
     commands.add_parser("robot-status")
+    commands.add_parser("robot-doctor")
+    commands.add_parser("robot-safe-stop")
     commands.add_parser("safe-stop")
+    diagnostics = commands.add_parser("diagnostics").add_subparsers(
+        dest="diagnostics_command", required=True
+    )
+    diagnostics_export = diagnostics.add_parser("export")
+    diagnostics_export.add_argument("--output", type=Path, default=Path("baymax-diagnostics.json"))
     ui = commands.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)
     ui.add_argument("--no-browser", action="store_true")
@@ -146,6 +154,14 @@ def main(argv: list[str] | None = None) -> int:
         checks = run_doctor(settings)
         print(format_checks(checks, args.json))
         return doctor_exit_code(checks)
+    if args.command == "robot-doctor":
+        checks = [check for check in run_doctor(settings) if "Reachy" in check.name]
+        print(format_checks(checks))
+        return doctor_exit_code(checks)
+    if args.command == "diagnostics":
+        export_diagnostics(settings, args.output)
+        print(f"Redacted diagnostics exported to {args.output}")
+        return 0
     if args.command == "config":
         if args.config_command == "show":
             print(json.dumps(settings.public_dict(), indent=2))
@@ -311,6 +327,19 @@ def main(argv: list[str] | None = None) -> int:
         if not args.confirm_supervised:
             print("Refusing hardware smoke test without --confirm-supervised", file=sys.stderr)
             return 2
+        missing = []
+        if settings.robot_backend != "reachy":
+            missing.append("BAYMAX_ROBOT_BACKEND=reachy")
+        if not settings.reachy_supervised:
+            missing.append("BAYMAX_CONFIRM_SUPERVISED=true")
+        if not settings.reachy_checklist_complete:
+            missing.append("BAYMAX_PHYSICAL_CHECKLIST_COMPLETE=true")
+        if missing:
+            print(
+                "Physical smoke test is fail-closed; missing: " + ", ".join(missing),
+                file=sys.stderr,
+            )
+            return 2
         robot = ReachyMiniRobot()
         try:
             robot.start()
@@ -323,7 +352,28 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "robot-status":
         status_robot = ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
-        print(json.dumps(status_robot.status(), indent=2))
+        status = status_robot.status()
+        status["readiness"] = {
+            "connection_mode": settings.reachy_connection_mode,
+            "supervised_confirmation": settings.reachy_supervised,
+            "physical_checklist_complete": settings.reachy_checklist_complete,
+            "safe_stop": "registered" if status.get("safe_stop_registered") else "not registered",
+            "movement_enabled": False,
+            "limits": {
+                "connection_timeout_seconds": settings.reachy_connection_timeout,
+                "watchdog_timeout_seconds": settings.reachy_watchdog_timeout,
+                "maximum_expression_duration_seconds": settings.reachy_max_expression_duration,
+                "maximum_movement": settings.reachy_max_movement,
+            },
+            "failure_result": "safe stop and shutdown; no movement",
+        }
+        print(json.dumps(status, indent=2))
+        return 0
+    if args.command == "robot-safe-stop":
+        stop_robot = ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
+        stop_robot.stop_motion()
+        stop_robot.shutdown()
+        print("Safe stop engaged; movement remains disabled and the adapter is shut down.")
         return 0
     if args.command == "voice-test":
         backend = (

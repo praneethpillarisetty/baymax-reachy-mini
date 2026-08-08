@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import importlib.util
+import importlib.metadata
 import threading
 from typing import Any
 
@@ -33,6 +34,22 @@ class ReachyMiniRobot:
     @staticmethod
     def sdk_available() -> bool:
         return importlib.util.find_spec("reachy_mini") is not None
+
+    @staticmethod
+    def sdk_version() -> str | None:
+        """Report metadata without guessing the SDK distribution name.
+
+        The official distribution name remains deliberately unset until official sources can be
+        reached. Import availability alone is not treated as verification.
+        """
+        if not ReachyMiniRobot.sdk_available():
+            return None
+        for distribution in importlib.metadata.packages_distributions().get("reachy_mini", []):
+            try:
+                return importlib.metadata.version(distribution)
+            except importlib.metadata.PackageNotFoundError:
+                continue
+        return "unknown"
 
     def connect(self) -> None:
         if not self.sdk_available():
@@ -73,6 +90,9 @@ class ReachyMiniRobot:
             "connected": self.connected,
             "motion_stopped": self.stop_event.is_set(),
             "sdk_import_available": self.sdk_available(),
+            "sdk_version": self.sdk_version(),
+            "sdk_verified": False,
+            "safe_stop_registered": False,
             "motion_enabled": False,
             "capabilities": ["supervised-integration-placeholder", "fail-closed-safe-stop"],
         }

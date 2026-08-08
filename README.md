@@ -29,6 +29,8 @@ Configuration is read from `--config FILE`, optional `.env`, and then environmen
 * `baymax voice-test microphone|speaker|asr|tts` — CI-safe adapter preflight with no retained audio.
 * `baymax robot-smoke --confirm-supervised` — deliberately fails closed until the official SDK adapter and hardware connection are validated.
 * `baymax robot-status` — print connection, safe-stop, SDK-discovery and capability status without connecting.
+* `baymax robot-doctor`, `baymax robot-safe-stop` — inspect the Reachy-only gates or engage the local fail-closed stop boundary.
+* `baymax diagnostics export [--output FILE]` — export bounded status metadata without logs, audio, credentials, or personal data.
 * `baymax safe-stop` — stop the selected adapter safely.
 
 ## Verification boundary
