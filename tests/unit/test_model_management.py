@@ -7,6 +7,7 @@ from baymax.models.activation import ModelActivation
 from baymax.models.capabilities import SystemCapabilities, evaluate, recommended_target
 from baymax.models.installation_state import InstallationStateStore
 from baymax.models.installer import ModelInstaller
+from baymax.models.manager import ModelManager
 from baymax.models.registry import RuntimeModelRegistry
 
 REGISTRY = Path("config/model-registry.toml")
@@ -180,3 +181,19 @@ def test_unverified_model_cannot_activate(tmp_path):
         assert "unverified" in str(exc)
     else:
         raise AssertionError("unverified model activated")
+
+
+def test_ollama_install_uses_declared_name_and_stays_unverified(tmp_path):
+    pulled = []
+    manager = ModelManager(tmp_path, ollama_pull=pulled.append)
+    manager.start_install("qwen3-4b-ollama", confirmed=True)
+    assert manager._worker is not None
+    manager._worker.join(timeout=2)
+    assert pulled == ["qwen3:4b"]
+    assert manager.progress()["stage"] == "complete"
+    try:
+        manager.activate({"llm": "qwen3-4b-ollama"})
+    except ValueError as exc:
+        assert "unverified" in str(exc)
+    else:
+        raise AssertionError("unverified Ollama model activated")

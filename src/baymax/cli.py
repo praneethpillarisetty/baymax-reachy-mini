@@ -254,11 +254,16 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         elif args.models_command in {"verify", "test"}:
-            print(
-                "Specify a verified installed model; built-in mock-llm passes deterministic testing."
-                if args.model_id not in {None, "mock-llm"}
-                else "mock-llm verification passed"
-            )
+            identifier = args.model_id or "mock-llm"
+            manager = ModelManager(settings.data_dir)
+            operation = manager.verify if args.models_command == "verify" else manager.test
+            try:
+                operation_result = operation(identifier)
+            except (KeyError, OSError, RuntimeError, ValueError) as exc:
+                print(f"Model {args.models_command} failed: {exc}", file=sys.stderr)
+                return 1
+            print(json.dumps(operation_result, indent=2))
+            return 0 if bool(operation_result["ok"]) else 1
         elif args.models_command == "activate":
             if not args.yes:
                 print("Refusing activation without --yes", file=sys.stderr)
