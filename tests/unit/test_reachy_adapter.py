@@ -18,6 +18,15 @@ def test_reachy_adapter_fails_closed_without_sdk(monkeypatch):
     assert robot.stop_event.is_set()
 
 
+def test_reachy_choreography_is_allow_listed_and_cancellable():
+    robot = ReachyMiniRobot()
+    with pytest.raises(ValueError, match="unsupported"):
+        robot.express("unbounded-motion")
+    robot.stop_motion()
+    with pytest.raises(ReachyConnectionError, match="cancelled"):
+        robot.express("caring")
+
+
 def test_robot_smoke_requires_explicit_confirmation(tmp_path, monkeypatch):
     from baymax.cli import main
 

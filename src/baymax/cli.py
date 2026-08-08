@@ -94,11 +94,16 @@ def parser() -> argparse.ArgumentParser:
     model_list.add_argument("--profiles-dir", type=Path, default=Path("config/model-profiles"))
     inspect = models.add_parser("inspect")
     inspect.add_argument("--profile", type=Path, required=True)
+    benchmark = commands.add_parser("benchmark")
+    benchmark.add_argument("model", type=Path)
+    benchmark.add_argument("--label", required=True)
     commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
     commands.add_parser("safe-stop")
     ui = commands.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)
     ui.add_argument("--no-browser", action="store_true")
+    voice_test = commands.add_parser("voice-test")
+    voice_test.add_argument("component", choices=("microphone", "speaker", "asr", "tts"))
     return root
 
 
@@ -181,6 +186,25 @@ def main(argv: list[str] | None = None) -> int:
                 )
             )
         return 0
+    if args.command == "benchmark":
+        if not args.model.is_file():
+            print(f"Model artifact not found: {args.model}", file=sys.stderr)
+            return 2
+        print(
+            json.dumps(
+                {
+                    "label": args.label,
+                    "artifact": str(args.model),
+                    "file_size_bytes": args.model.stat().st_size,
+                    "runtime_verified": False,
+                    "peak_ram_bytes": None,
+                    "response_latency_seconds": None,
+                    "status": "metadata-only; provide a verified runner before inference",
+                },
+                indent=2,
+            )
+        )
+        return 0
     if args.command == "robot-smoke":
         if not args.confirm_supervised:
             print("Refusing hardware smoke test without --confirm-supervised", file=sys.stderr)
@@ -195,13 +219,49 @@ def main(argv: list[str] | None = None) -> int:
             robot.shutdown()
         print("Supervised Reachy Mini connection and safe shutdown passed.")
         return 0
+    if args.command == "voice-test":
+        backend = (
+            settings.asr_backend
+            if args.component in {"microphone", "asr"}
+            else settings.tts_backend
+        )
+        if backend not in {"mock", "console"}:
+            executable = (
+                settings.asr_executable
+                if args.component in {"microphone", "asr"}
+                else settings.tts_executable
+            )
+            model = (
+                settings.asr_model_path
+                if args.component in {"microphone", "asr"}
+                else settings.tts_model_path
+            )
+            if (
+                executable is None
+                or not executable.is_file()
+                or model is None
+                or not model.exists()
+            ):
+                print(
+                    f"{args.component} unavailable: configure explicit executable and model paths",
+                    file=sys.stderr,
+                )
+                return 1
+        print(f"{args.component} adapter health check passed ({backend}); no audio was retained")
+        return 0
     app = build_app(settings)
     try:
         if args.command == "ui":
             if not 0 <= args.port <= 65535:
                 print("UI port must be between 0 and 65535", file=sys.stderr)
                 return 2
-            run_ui(app, args.port, not args.no_browser)
+            run_ui(
+                app,
+                args.port,
+                not args.no_browser,
+                backend=settings.llm_backend,
+                mode=settings.mode,
+            )
             return 0
         if args.command == "safe-stop":
             return 0

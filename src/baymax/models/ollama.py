@@ -31,6 +31,8 @@ class OllamaModel:
             req = request.Request(f"{self.url}{path}", body, {"Content-Type": "application/json"})
             try:
                 with request.urlopen(req, timeout=self.timeout) as response:
+                    if response.status != 200:
+                        raise OllamaConnectionError(f"Ollama returned HTTP {response.status}")
                     value = json.loads(response.read())
                     if not isinstance(value, dict):
                         raise TypeError("Ollama response is not an object")
@@ -49,11 +51,11 @@ class OllamaModel:
         except OllamaConnectionError as exc:
             return False, str(exc)
         models = result.get("models", [])
-        names = (
-            [item.get("name", "") for item in models if isinstance(item, dict)]
-            if isinstance(models, list)
-            else []
-        )
+        if not isinstance(models, list):
+            return False, "Ollama /api/tags returned an invalid models field"
+        names = [
+            item.get("name", item.get("model", "")) for item in models if isinstance(item, dict)
+        ]
         if self.model not in names:
             return (
                 False,

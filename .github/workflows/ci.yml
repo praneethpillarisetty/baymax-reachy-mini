@@ -18,6 +18,7 @@ jobs:
       - run: python -m mypy src/baymax
       - run: python -m build
       - run: python -m baymax.cli --once "CI simulator smoke test"
+      - run: python -m baymax.cli doctor
   windows-executable:
     runs-on: windows-latest
     steps:

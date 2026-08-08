@@ -13,11 +13,11 @@ class ConversationOrchestrator:
         if response is None:
             try:
                 response = self.model.generate(text, self.system_prompt)
-            except Exception:
+            except Exception:  # noqa: BLE001 -- model adapters have diverse optional runtime errors
                 if self.fallback_model is not None:
                     try:
                         response = self.fallback_model.generate(text, self.system_prompt)
-                    except Exception:
+                    except Exception:  # noqa: BLE001 -- fallback adapters also have optional runtimes
                         response = self._failure()
                 else:
                     response = self._failure()
@@ -26,7 +26,7 @@ class ConversationOrchestrator:
         for action in response.actions:
             try:
                 results.append(self.tools.execute(action))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- surface allow-listed tool failures
                 results.append(f"Action failed: {exc}")
         if results:
             response = ModelResponse(

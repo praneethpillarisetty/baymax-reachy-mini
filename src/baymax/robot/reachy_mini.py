@@ -21,6 +21,10 @@ class ReachyMiniRobot:
     from being mistaken for a tested physical connection.
     """
 
+    EXPRESSIONS = frozenset(
+        {"neutral", "greeting", "listening", "thinking", "caring", "concern", "reminder"}
+    )
+
     def __init__(self) -> None:
         self.stop_event = threading.Event()
         self.connected = False
@@ -41,10 +45,19 @@ class ReachyMiniRobot:
         )
 
     def start(self) -> None:
+        self.stop_event.clear()
         self.connect()
 
     def express(self, emotion: str) -> None:
-        raise ReachyConnectionError("Physical expression refused: no verified robot connection")
+        if emotion not in self.EXPRESSIONS:
+            raise ValueError(f"unsupported Reachy expression: {emotion}")
+        if self.stop_event.is_set():
+            raise ReachyConnectionError("Physical expression cancelled by safe stop")
+        if not self.connected:
+            raise ReachyConnectionError("Physical expression refused: no supervised connection")
+        raise ReachyIntegrationNotVerified(
+            "Physical movement remains disabled until the official motion API is verified"
+        )
 
     def stop_motion(self) -> None:
         self.stop_event.set()

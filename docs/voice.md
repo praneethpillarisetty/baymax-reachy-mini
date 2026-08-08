@@ -6,4 +6,6 @@ Candidate investigations include whisper.cpp/faster-whisper tiny-class ASR, Pipe
 
 Generic local-command paths are configured with `BAYMAX_ASR_EXECUTABLE`, `BAYMAX_ASR_MODEL_PATH`, `BAYMAX_TTS_EXECUTABLE`, and `BAYMAX_TTS_MODEL_PATH`. `baymax doctor` fails a selected local backend when either file is absent. No implementation is labeled verified on Reachy Wireless in this checkout: only fake microphone/speaker and subprocess tests have run.
 
+Run `baymax voice-test microphone`, `baymax voice-test speaker`, `baymax voice-test asr`, and `baymax voice-test tts` before enabling a voice loop. Mock/console checks are CI-safe and capture nothing. A selected local adapter fails clearly unless its explicit executable and model paths exist; the application never downloads either and retains no test recording.
+
 On Windows, after selecting an official artifact URL and published SHA-256, run `.\scripts\download_voice_model.ps1 -Url URL -Sha256 HASH -Output models\voice\MODEL`. Check any local artifact with `python scripts/check_voice_model.py PATH --sha256 HASH`. No default URL is embedded because no cross-platform voice artifact has been verified for both deployment targets.

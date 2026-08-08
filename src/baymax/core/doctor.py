@@ -5,6 +5,7 @@ import importlib.util
 import json
 import platform
 import shutil
+import sqlite3
 import sys
 from dataclasses import asdict, dataclass
 from typing import Literal
@@ -79,7 +80,8 @@ def run_doctor(settings: Settings) -> list[Check]:
     try:
         LocalStore(settings.database_path)
         checks.append(Check("database", "pass", str(settings.database_path)))
-    except Exception as exc:
+    except (OSError, PermissionError, sqlite3.DatabaseError) as exc:
+        # Narrow exception handling to filesystem/DB errors only; doctor must not crash for unexpected issues
         checks.append(Check("database", "fail", str(exc), "Choose a writable DATABASE_PATH."))
 
     ollama = OllamaModel(
@@ -136,7 +138,7 @@ def run_doctor(settings: Settings) -> list[Check]:
                     f"{adapter.profile.id}: model and tokenizer found",
                 )
             )
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 -- optional LiteRT runtimes vary
             checks.append(
                 Check(
                     "LiteRT profile/files",
