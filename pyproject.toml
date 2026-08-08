@@ -7,7 +7,7 @@ name = "baymax-reachy-mini"
 version = "0.3.1"
 description = "Local-first wellness companion shared core and platform adapters"
 readme = "README.md"
-requires-python = ">=3.10,<3.14"
+requires-python = ">=3.10,<3.15"
 license = {text = "MIT"}
 dependencies = ["typing-extensions>=4.4"]
 

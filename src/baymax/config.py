@@ -47,6 +47,7 @@ class Settings:
     asr_model_path: Path | None = None
     tts_executable: Path | None = None
     tts_model_path: Path | None = None
+    tts_voice_id: str = "neutral"
     ollama_url: str = "http://127.0.0.1:11434"
     ollama_model: str = "qwen3:4b"
     ollama_timeout: float = 30.0
@@ -91,6 +92,7 @@ class Settings:
             "asr_model_path": "ASR_MODEL_PATH",
             "tts_executable": "TTS_EXECUTABLE",
             "tts_model_path": "TTS_MODEL_PATH",
+            "tts_voice_id": "TTS_VOICE_ID",
             "ollama_url": "OLLAMA_URL",
             "ollama_model": "OLLAMA_MODEL",
             "ollama_timeout": "OLLAMA_TIMEOUT",

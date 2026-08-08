@@ -56,6 +56,9 @@ class ConversationOrchestrator:
             cancel = getattr(model, "cancel", None)
             if callable(cancel):
                 cancel()
+        cancel_tts = getattr(self.tts, "cancel", None)
+        if callable(cancel_tts):
+            cancel_tts()
 
     @staticmethod
     def _failure() -> ModelResponse:
