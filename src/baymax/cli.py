@@ -6,8 +6,8 @@ import sys
 from pathlib import Path
 
 from .config import Settings
-from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .core.diagnostics import export_diagnostics
+from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .core.readiness import capability_report
 from .core.transfer import export_profile, import_profile
 from .memory import LocalStore

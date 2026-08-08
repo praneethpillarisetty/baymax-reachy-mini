@@ -10,7 +10,8 @@ from ..config import Settings
 from .doctor import run_doctor
 
 _SENSITIVE = re.compile(
-    r"(api[-_]?key|token|secret|password|credential|wifi|wi-fi|ssid|audio|transcript)", re.I
+    r"(api[-_]?key|token|secret|password|credential|wifi|wi-fi|ssid|audio|transcript)",
+    re.IGNORECASE,
 )
 
 
