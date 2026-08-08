@@ -7,3 +7,7 @@ Before filling `deploy/reachy-mini`, verify the official root `AGENTS.md`, packa
 On 2026-08-08 both permitted retrieval paths were retried: the documentation tool returned HTTP 401 and direct GitHub/Hugging Face HTTPS returned HTTP 403. The SDK is not installed in the build image. Consequently there is still no verified package version, Python matrix, generator command, daemon command, constructor, media/motion API, app lifecycle, deployment command, filesystem path, or log command to record. `ReachyMiniRobot` can be imported and inspected without connecting, but `connect()` fails closed even if an SDK later appears; replace that gate only in an environment where the official sources and supervised robot are available.
 
 The adapter validates only the local choreography vocabulary (`greeting`, `listening`, `thinking`, `caring`, `concern`, `reminder`, and `neutral`) and cancellation state. It intentionally sends no SDK movement command. This boundary is simulator-tested, not official-simulator-tested or physical-robot-tested.
+
+The setup dashboard reports SDK discovery and the supervised checklist boundary only. It exposes no
+movement control and cannot activate physical mode. Model installation never changes the simulator
+robot default.

@@ -4,4 +4,9 @@ Catalog presence does not establish Raspberry Pi or Reachy compatibility. Evalua
 
 No winner is claimed because the current catalog could not be fetched and no target measurements exist. Granite 350M's parameter count suggests a resource hypothesis only; it is not compatibility evidence. MedGemma is laptop research, never the onboard default or medical authority. Use `python scripts/benchmark_model.py PATH --label NAME`; null fields must remain null until measured.
 
+The setup dashboard detects runtime import availability and can display registered metadata. It
+cannot install or activate LiteRT inference until the exact model file, tokenizer, checksum,
+signatures, architecture, runtime version, and input/output contract are verified. No alternate
+runtime is silently selected.
+
 `baymax benchmark MODEL --label NAME` performs the packaged, non-executing artifact inventory and reports file size with runtime/RAM/latency explicitly unverified. `python scripts/benchmark_model.py` remains the developer probe harness. Neither command enables inference or establishes Reachy compatibility. No exact runner is enabled because no artifact, tokenizer/signature contract, license, ARM64 runtime, or target measurement could be verified in this environment.

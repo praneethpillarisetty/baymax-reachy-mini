@@ -8,4 +8,9 @@ Generic local-command paths are configured with `ASR_EXECUTABLE`, `ASR_MODEL_PAT
 
 Run `baymax voice-test microphone`, `baymax voice-test speaker`, `baymax voice-test asr`, and `baymax voice-test tts` before enabling a voice loop. Mock/console checks are CI-safe and capture nothing. A selected local adapter fails clearly unless its explicit executable and model paths exist; the application never downloads either and retains no test recording.
 
+The model dashboard lists `faster-whisper-small` and `piper-en-us-lessac-medium` only as unverified
+candidates. It does not download or activate them because exact artifact checksums and target
+runtime contracts were unavailable. No medical accuracy is claimed. TTS must use a neutral
+synthetic voice; cloning Baymax, Scott Adsit, or any actor is prohibited. Wake word remains disabled.
+
 On Windows, after selecting an official artifact URL and published SHA-256, run `.\scripts\download_voice_model.ps1 -Url URL -Sha256 HASH -Output models\voice\MODEL`. Check any local artifact with `python scripts/check_voice_model.py PATH --sha256 HASH`. No default URL is embedded because no cross-platform voice artifact has been verified for both deployment targets.

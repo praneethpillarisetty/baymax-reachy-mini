@@ -3,6 +3,8 @@
 All modes use the same safety-first orchestrator. Configuration precedence is built-in defaults,
 an optional TOML file (`--config` or `BAYMAX_CONFIG`), an optional `.env` file, then process
 environment variables. Inspect the effective redacted configuration with `baymax config show`.
+The UI remains bound to `127.0.0.1`; it does not add remote authentication because it cannot bind
+to another interface. Use its first-run dashboard or the commands in `model-setup.md`.
 
 ## Simulator (offline default)
 
@@ -60,3 +62,7 @@ The smoke command currently fails closed. Do not run it as a claim of motion sup
 SDK constructor, lifecycle, capabilities, limits, simulator, and emergency-stop contract must first
 be verified and implemented from current official sources, then reviewed using the physical robot
 checklist.
+
+On Raspberry Pi/Linux ARM64 the detector checks RAM, disk, Python and optional runtimes. It does not
+create a network route, install unknown dependencies, enable a wake word, or switch the robot away
+from simulator. Local LLM suitability remains unverified; private-LAN laptop Ollama is opt-in only.

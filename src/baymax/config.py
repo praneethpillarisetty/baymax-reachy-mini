@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import platform
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -51,8 +51,8 @@ class Settings:
     litert_model_path: Path | None = None
     litert_tokenizer_path: Path | None = None
     litert_model_profile: Path | None = None
-    data_dir: Path = default_data_dir()
-    database_path: Path = default_data_dir() / "data/baymax.sqlite3"
+    data_dir: Path = field(default_factory=default_data_dir)
+    database_path: Path = field(default_factory=lambda: default_data_dir() / "data/baymax.sqlite3")
     log_level: str = "INFO"
     system_prompt: str = "You are a calm, kind, concise local wellness companion."
 
@@ -100,14 +100,16 @@ class Settings:
             "log_level": "BAYMAX_LOG_LEVEL",
             "system_prompt": "BAYMAX_SYSTEM_PROMPT",
         }
-        for field, env in env_map.items():
+        for setting_name, env in env_map.items():
             if env in os.environ:
-                values[field] = os.environ[env]
+                values[setting_name] = os.environ[env]
         # Backwards-compatible aliases; the documented unprefixed variables take priority.
-        for field in ("asr_executable", "asr_model_path", "tts_executable", "tts_model_path"):
-            old = f"BAYMAX_{field.upper()}"
-            if field not in values and old in os.environ:
-                values[field] = os.environ[old]
+        for setting_name in (
+            "asr_executable", "asr_model_path", "tts_executable", "tts_model_path"
+        ):
+            old = f"BAYMAX_{setting_name.upper()}"
+            if setting_name not in values and old in os.environ:
+                values[setting_name] = os.environ[old]
         for key in ("ollama_timeout", "ollama_temperature"):
             if key in values:
                 values[key] = float(values[key])

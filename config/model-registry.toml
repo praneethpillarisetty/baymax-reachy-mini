@@ -1,0 +1,89 @@
+[mock-llm]
+purpose = "llm"
+provider = "executable"
+source_url = "https://github.com/praneethpillarisetty/baymax-reachy-mini"
+license_url = "https://github.com/praneethpillarisetty/baymax-reachy-mini/blob/main/pyproject.toml"
+checksum = "built-in"
+operating_systems = "windows,linux,darwin"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 0
+minimum_disk_mb = 0
+download_size_mb = 0
+runtime_adapter = "baymax.models.mock.MockModel"
+installation_method = "built-in"
+verification_method = "deterministic response test"
+laptop_recommendation = "safe offline default"
+raspberry_pi_recommendation = "safe offline default"
+status = "verified"
+
+[qwen3-4b-ollama]
+purpose = "llm"
+provider = "ollama"
+source_url = "https://ollama.com/library/qwen3:4b"
+license_url = "https://github.com/QwenLM/Qwen3/blob/main/LICENSE"
+checksum = ""
+operating_systems = "windows,linux,darwin"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 8192
+minimum_disk_mb = 4096
+download_size_mb = 2500
+runtime_adapter = "baymax.models.ollama.OllamaModel"
+installation_method = "ollama pull qwen3:4b after confirmation"
+verification_method = "ollama list, /api/tags, bounded /api/chat"
+laptop_recommendation = "candidate pending live verification"
+raspberry_pi_recommendation = "not recommended; use laptop Ollama privately"
+status = "unverified"
+
+[faster-whisper-small]
+purpose = "stt"
+provider = "huggingface"
+source_url = "https://huggingface.co/Systran/faster-whisper-small"
+license_url = "https://huggingface.co/Systran/faster-whisper-small/blob/main/README.md"
+checksum = ""
+operating_systems = "windows,linux,darwin"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 4096
+minimum_disk_mb = 2048
+download_size_mb = 1000
+runtime_adapter = "unverified local executable boundary"
+installation_method = "manual official instructions"
+verification_method = "explicit executable/model path and synthetic audio"
+laptop_recommendation = "candidate pending runtime verification"
+raspberry_pi_recommendation = "not automatically recommended"
+status = "unverified"
+
+[piper-en-us-lessac-medium]
+purpose = "tts"
+provider = "huggingface"
+source_url = "https://huggingface.co/rhasspy/piper-voices/tree/main/en/en_US/lessac/medium"
+license_url = "https://huggingface.co/rhasspy/piper-voices/blob/main/LICENSE"
+checksum = ""
+operating_systems = "windows,linux"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 1024
+minimum_disk_mb = 256
+download_size_mb = 64
+runtime_adapter = "unverified local executable boundary"
+installation_method = "manual official instructions"
+verification_method = "explicit executable/model path and synthetic text"
+laptop_recommendation = "candidate neutral synthetic voice"
+raspberry_pi_recommendation = "candidate pending ARM64 verification"
+status = "unverified"
+
+[openwakeword]
+purpose = "wake_word"
+provider = "huggingface"
+source_url = "https://github.com/dscripka/openWakeWord"
+license_url = "https://github.com/dscripka/openWakeWord/blob/main/LICENSE"
+checksum = ""
+operating_systems = "windows,linux,darwin"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 512
+minimum_disk_mb = 256
+download_size_mb = 100
+runtime_adapter = "not implemented"
+installation_method = "disabled; manual research only"
+verification_method = "not verified"
+laptop_recommendation = "optional and disabled by default"
+raspberry_pi_recommendation = "optional and disabled by default"
+status = "unverified"
