@@ -1,4 +1,6 @@
 import json
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from unittest.mock import patch
 
@@ -97,6 +99,42 @@ def test_ollama_health_requires_configured_model():
         available, detail = model.health_check()
     assert available
     assert "is installed" in detail
+
+
+def test_ollama_mock_server_tags_and_chat_contract():
+    seen = []
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            assert self.path == "/api/tags"
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b'{"models":[{"model":"local:test"}]}')
+
+        def do_POST(self):
+            assert self.path == "/api/chat"
+            payload = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+            seen.append(payload)
+            self.send_response(200)
+            self.end_headers()
+            response = {"message": {"content": json.dumps({"message": "ok"})}}
+            self.wfile.write(json.dumps(response).encode())
+
+        def log_message(self, format, *args):
+            return
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        model = OllamaModel(f"http://127.0.0.1:{server.server_port}", "local:test", 1, 32, 0, 0)
+        assert model.health_check()[0]
+        assert model.generate("hello", "safe").message == "ok"
+        assert seen[0]["stream"] is False and seen[0]["model"] == "local:test"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=2)
 
 
 def test_reminder_create_failure_and_complete(tmp_path):
@@ -201,3 +239,46 @@ def test_audio_adapter_failure():
 
     with pytest.raises(RuntimeError):
         AudioPipeline(BadASR(), MockTTS()).receive()
+
+
+def test_safe_stop_cancels_model_before_future_expressions(tmp_path):
+    class Cancellable(MockModel):
+        def __init__(self):
+            self.cancelled = False
+
+        def cancel(self):
+            self.cancelled = True
+
+    model = Cancellable()
+    companion = app(tmp_path, model)
+    companion.safe_stop()
+    assert model.cancelled
+    companion.handle("hello")
+    assert "caring" not in companion.robot.events
+
+
+def test_voice_and_robot_failures_preserve_text_response(tmp_path):
+    class FailedOutput:
+        def speak(self, text):
+            raise OSError("speaker missing")
+
+    class FailedRobot(SimulatorRobot):
+        def express(self, emotion):
+            raise RuntimeError("robot missing")
+
+    robot = FailedRobot()
+    robot.start()
+    companion = ConversationOrchestrator(
+        MockModel(),
+        SafetyEngine(),
+        ToolExecutor(LocalStore(tmp_path / "fail.sqlite")),
+        robot,
+        FailedOutput(),
+        "kind",
+    )
+    assert "hello" in companion.handle("hello").message
+
+
+def test_oversized_request_is_rejected_before_model(tmp_path):
+    with pytest.raises(ValueError, match="1-4000"):
+        app(tmp_path, Broken()).handle("x" * 4001)

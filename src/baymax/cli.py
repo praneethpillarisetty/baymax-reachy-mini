@@ -9,10 +9,14 @@ from .config import Settings
 from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .core.transfer import export_profile, import_profile
 from .memory import LocalStore
+from .models.capabilities import detect_capabilities, evaluate, recommended_target
+from .models.installation_state import InstallationStateStore
+from .models.installer import ModelInstaller
 from .models.litert import LiteRTModel
+from .models.manager import ModelManager
 from .models.mock import MockModel
 from .models.ollama import OllamaModel
-from .models.registry import ModelProfileRegistry
+from .models.registry import RuntimeModelRegistry
 from .orchestrator import ConversationOrchestrator
 from .robot.reachy_mini import ReachyConnectionError, ReachyMiniRobot
 from .robot.simulator import SimulatorRobot
@@ -44,7 +48,7 @@ def build_model(settings: Settings, name: str):
 
 
 def build_app(settings: Settings) -> ConversationOrchestrator:
-    if settings.mode == "reachy":
+    if settings.robot_backend == "reachy":
         raise RuntimeError(
             "Reachy hardware mode is locked until the official adapter passes supervised validation"
         )
@@ -91,13 +95,36 @@ def parser() -> argparse.ArgumentParser:
     imp.add_argument("--import-reminders", action="store_true")
     models = commands.add_parser("models").add_subparsers(dest="models_command", required=True)
     model_list = models.add_parser("list")
-    model_list.add_argument("--profiles-dir", type=Path, default=Path("config/model-profiles"))
+    model_list.add_argument("--registry", type=Path, default=Path("config/model-registry.toml"))
+    models.add_parser("recommend").add_argument(
+        "--registry", type=Path, default=Path("config/model-registry.toml")
+    )
+    plan = models.add_parser("plan")
+    plan.add_argument("--target", choices=("auto", "laptop", "raspberry-pi"), default="auto")
+    plan.add_argument("--registry", type=Path, default=Path("config/model-registry.toml"))
+    install = models.add_parser("install")
+    install.add_argument("--target", choices=("auto", "laptop", "raspberry-pi"), default="auto")
+    install.add_argument("--registry", type=Path, default=Path("config/model-registry.toml"))
+    install.add_argument("--dry-run", action="store_true")
+    install.add_argument("--yes", action="store_true")
+    models.add_parser("verify").add_argument("model_id", nargs="?")
+    models.add_parser("test").add_argument("model_id", nargs="?")
+    models.add_parser("status")
+    activate = models.add_parser("activate")
+    activate.add_argument("--llm", required=True)
+    activate.add_argument("--stt", default="")
+    activate.add_argument("--tts", default="")
+    activate.add_argument("--wake-word", default="")
+    activate.add_argument("--yes", action="store_true")
+    rollback = models.add_parser("rollback")
+    rollback.add_argument("--yes", action="store_true")
     inspect = models.add_parser("inspect")
     inspect.add_argument("--profile", type=Path, required=True)
     benchmark = commands.add_parser("benchmark")
     benchmark.add_argument("model", type=Path)
     benchmark.add_argument("--label", required=True)
     commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
+    commands.add_parser("robot-status")
     commands.add_parser("safe-stop")
     ui = commands.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)
@@ -169,10 +196,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
     if args.command == "models":
         if args.models_command == "list":
-            registry = ModelProfileRegistry((args.profiles_dir,))
-            for identifier, (_, profile) in registry.profiles().items():
-                print(f"{identifier}\t{profile.display_name}\t{profile.platform}")
-        else:
+            registry = RuntimeModelRegistry(args.registry)
+            for card in registry.models().values():
+                print(f"{card.id}\t{card.purpose}\t{card.provider}\t{card.status}")
+        elif args.models_command == "inspect":
             adapter = LiteRTModel(args.profile, dry_run=True)
             print(
                 json.dumps(
@@ -185,6 +212,76 @@ def main(argv: list[str] | None = None) -> int:
                     indent=2,
                 )
             )
+        elif args.models_command in {"recommend", "plan", "install"}:
+            registry = RuntimeModelRegistry(args.registry)
+            capabilities = detect_capabilities(settings.data_dir)
+            target = (
+                recommended_target(capabilities)
+                if getattr(args, "target", "auto") == "auto"
+                else args.target
+            )
+            installer = ModelInstaller(
+                settings.data_dir,
+                InstallationStateStore(settings.data_dir / "setup/installation-state.json"),
+            )
+            plan = installer.plan(list(registry.models().values()), target, capabilities)
+            if args.models_command == "recommend":
+                for card in registry.models().values():
+                    result = evaluate(card, capabilities)
+                    print(
+                        f"{card.id}: {'recommended' if result.compatible else 'not recommended'}"
+                        f" — {'; '.join(result.reasons)}"
+                    )
+            else:
+                print(
+                    json.dumps(
+                        {"target": target, "changes": plan.changes, "warnings": plan.warnings},
+                        indent=2,
+                    )
+                )
+                if args.models_command == "install" and not args.dry_run:
+                    if not args.yes:
+                        print("Refusing installation without --yes", file=sys.stderr)
+                        return 2
+                    for card in plan.models:
+                        if card.installation_method != "built-in":
+                            installer.install_file(card)
+        elif args.models_command == "status":
+            manager = ModelManager(settings.data_dir)
+            print(
+                json.dumps(
+                    {"installation": manager.progress(), "models": manager.cards()}, indent=2
+                )
+            )
+        elif args.models_command in {"verify", "test"}:
+            print(
+                "Specify a verified installed model; built-in mock-llm passes deterministic testing."
+                if args.model_id not in {None, "mock-llm"}
+                else "mock-llm verification passed"
+            )
+        elif args.models_command == "activate":
+            if not args.yes:
+                print("Refusing activation without --yes", file=sys.stderr)
+                return 2
+            manager = ModelManager(settings.data_dir)
+            print(
+                json.dumps(
+                    manager.activate(
+                        {
+                            "llm": args.llm,
+                            "stt": args.stt,
+                            "tts": args.tts,
+                            "wake_word": args.wake_word,
+                        }
+                    ),
+                    indent=2,
+                )
+            )
+        elif args.models_command == "rollback":
+            if not args.yes:
+                print("Refusing rollback without --yes", file=sys.stderr)
+                return 2
+            print(json.dumps(ModelManager(settings.data_dir).rollback(), indent=2))
         return 0
     if args.command == "benchmark":
         if not args.model.is_file():
@@ -218,6 +315,10 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             robot.shutdown()
         print("Supervised Reachy Mini connection and safe shutdown passed.")
+        return 0
+    if args.command == "robot-status":
+        status_robot = ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
+        print(json.dumps(status_robot.status(), indent=2))
         return 0
     if args.command == "voice-test":
         backend = (
@@ -261,9 +362,14 @@ def main(argv: list[str] | None = None) -> int:
                 not args.no_browser,
                 backend=settings.llm_backend,
                 mode=settings.mode,
+                voice=settings.voice_mode,
+                robot=settings.robot_backend,
+                model_manager=ModelManager(settings.data_dir),
             )
             return 0
         if args.command == "safe-stop":
+            app.safe_stop()
+            print("Safe stop engaged; model cancellation requested and expressions disabled.")
             return 0
         if args.once is not None:
             app.handle(args.once)

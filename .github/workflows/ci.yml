@@ -19,6 +19,14 @@ jobs:
       - run: python -m build
       - run: python -m baymax.cli --once "CI simulator smoke test"
       - run: python -m baymax.cli doctor
+      - run: python -m baymax.cli config show
+      - run: python -m baymax.cli models list
+      - run: python -m baymax.cli models recommend
+      - run: python -m baymax.cli models plan --target auto
+      - run: python -m baymax.cli models status
+      - run: python -m baymax.cli voice-test microphone
+      - run: python -m baymax.cli robot-status
+      - run: python -m baymax.cli safe-stop
   windows-executable:
     runs-on: windows-latest
     steps:

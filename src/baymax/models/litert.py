@@ -74,6 +74,16 @@ class LiteRTModel:
                 raise FileNotFoundError(f"tokenizer missing: {self.tokenizer_path}")
         self.runner = runner
 
+    def health_check(self) -> tuple[bool, str]:
+        if self.runner is None:
+            return False, "LiteRT inference not verified: no exact tokenizer/signature runner"
+        return True, f"verified runner registered for {self.profile.id}"
+
+    def cancel(self) -> None:
+        cancel = getattr(self.runner, "cancel", None)
+        if callable(cancel):
+            cancel()
+
     def inspect_signatures(self) -> dict[str, Any]:
         if self.runner:
             return self.runner.inspect_signatures()

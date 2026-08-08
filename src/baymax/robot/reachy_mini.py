@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import importlib.util
 import threading
+from typing import Any
 
 
 class ReachyConnectionError(RuntimeError):
@@ -65,3 +66,13 @@ class ReachyMiniRobot:
     def shutdown(self) -> None:
         self.stop_motion()
         self.connected = False
+
+    def status(self) -> dict[str, Any]:
+        return {
+            "backend": "reachy",
+            "connected": self.connected,
+            "motion_stopped": self.stop_event.is_set(),
+            "sdk_import_available": self.sdk_available(),
+            "motion_enabled": False,
+            "capabilities": ["supervised-integration-placeholder", "fail-closed-safe-stop"],
+        }

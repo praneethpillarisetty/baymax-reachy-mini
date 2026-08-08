@@ -2,6 +2,8 @@
 mode = "laptop"
 llm_backend = "ollama"
 fallback_llm_backend = "mock"
+voice_mode = "console"
+robot_backend = "simulator"
 ollama_url = "http://127.0.0.1:11434"
 ollama_model = "qwen3:4b"
 ollama_retries = 2
