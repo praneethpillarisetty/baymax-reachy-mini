@@ -1,8 +1,8 @@
 import io
 import json
-from urllib.error import URLError
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import URLError
 
 from baymax.models.ollama import OllamaConnectionError, OllamaModel
 
