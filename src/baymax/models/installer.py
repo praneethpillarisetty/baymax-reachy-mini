@@ -8,6 +8,7 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import BinaryIO, Protocol
 from urllib import request
+from urllib.error import HTTPError, URLError
 
 from typing_extensions import Self
 
@@ -104,7 +105,7 @@ class ModelInstaller:
                 )
             )
             return destination
-        except Exception as exc:
+        except (HTTPError, URLError, TimeoutError, OSError, RuntimeError, ValueError) as exc:
             stage: Stage = "cancelled" if self.cancel_event.is_set() else "failed"
             self.state.save(
                 InstallationProgress(

@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import threading
+import subprocess
 from dataclasses import asdict
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from .activation import ModelActivation
@@ -10,12 +12,18 @@ from .capabilities import detect_capabilities, evaluate, recommended_target
 from .installation_state import InstallationProgress, InstallationStateStore
 from .installer import ModelInstaller
 from .registry import RuntimeModelRegistry
+from .verification import verify_file, verify_ollama_cli
 
 
 class ModelManager:
     """Local model setup facade shared by CLI and localhost UI."""
 
-    def __init__(self, data_dir: Path, registry_path: Path = Path("config/model-registry.toml")):
+    def __init__(
+        self,
+        data_dir: Path,
+        registry_path: Path = Path("config/model-registry.toml"),
+        ollama_pull: Callable[[str], None] | None = None,
+    ):
         self.data_dir = data_dir
         self.registry = RuntimeModelRegistry(registry_path)
         self.state = InstallationStateStore(data_dir / "setup/installation-state.json")
@@ -25,6 +33,17 @@ class ModelManager:
         self._worker: threading.Thread | None = None
         self._last_model = ""
         self._event_lock = threading.Lock()
+        self._ollama_pull = ollama_pull or self._pull_with_ollama_cli
+
+    @staticmethod
+    def _pull_with_ollama_cli(name: str) -> None:
+        """Pull one registry-declared name; never execute model-card scripts."""
+        subprocess.run(
+            ["ollama", "pull", name],
+            check=True,
+            timeout=3600,
+            stdin=subprocess.DEVNULL,
+        )
 
     def setup_status(self) -> dict[str, Any]:
         capabilities = detect_capabilities(self.data_dir)
@@ -46,7 +65,8 @@ class ModelManager:
                 {
                     "compatible": compatibility.compatible,
                     "compatibility_reasons": compatibility.reasons,
-                    "installed": card.installation_method == "built-in",
+                    "installed": card.installation_method == "built-in"
+                    or (self.data_dir / "models" / card.id / "manifest.json").is_file(),
                     "active": card.id in self.activation.active().values(),
                     "operation_active": progress.stage
                     in {
@@ -83,14 +103,34 @@ class ModelManager:
             self.state.save(InstallationProgress(card.id, "complete"))
             self.record("info", f"{card.id} is built in; no download was performed")
             return
-        if card.status != "verified":
+        if card.status != "verified" and card.provider != "ollama":
             raise RuntimeError("unverified models cannot be installed automatically")
 
         def run() -> None:
             try:
-                self.installer.install_file(card)
+                if card.provider == "ollama":
+                    self.state.save(InstallationProgress(card.id, "installing"))
+                    self._ollama_pull(card.source_url.rsplit("/", 1)[-1])
+                    self.state.save(InstallationProgress(card.id, "complete"))
+                else:
+                    self.installer.install_file(card)
                 self.record("info", f"{card.id} installation completed")
-            except (OSError, RuntimeError, ValueError) as exc:
+            except (
+                FileNotFoundError,
+                OSError,
+                RuntimeError,
+                ValueError,
+                subprocess.CalledProcessError,
+                subprocess.TimeoutExpired,
+            ) as exc:
+                self.state.save(
+                    InstallationProgress(
+                        card.id,
+                        "failed",
+                        error=f"{type(exc).__name__}: {exc}",
+                        recovery="Check Ollama/network availability, then retry.",
+                    )
+                )
                 self.record("error", f"{card.id}: {exc}")
 
         self._worker = threading.Thread(target=run, daemon=True, name="baymax-model-install")
@@ -121,6 +161,22 @@ class ModelManager:
         ok = self.activation.provider_test(identifier)
         self.record("info" if ok else "error", f"provider test for {identifier}: {ok}")
         return {"model_id": identifier, "ok": ok}
+
+    def verify(self, identifier: str) -> dict[str, object]:
+        """Verify an installed artifact without activating or running model-card code."""
+        card = self.registry.require(identifier)
+        if card.status != "verified":
+            raise ValueError("unverified models cannot be marked verified")
+        if card.installation_method == "built-in":
+            ok, detail = True, "built-in adapter requires no artifact"
+        elif card.provider == "ollama":
+            result = verify_ollama_cli(card.source_url.rsplit("/", 1)[-1])
+            ok, detail = result.ok, result.detail
+        else:
+            result = verify_file(card, self.data_dir / "models" / card.id / "model.bin")
+            ok, detail = result.ok, result.detail
+        self.record("info" if ok else "error", f"verification for {identifier}: {detail}")
+        return {"model_id": identifier, "ok": ok, "detail": detail}
 
     def activate(self, selected: dict[str, str]) -> dict[str, str]:
         self.state.save(InstallationProgress(stage="activating"))

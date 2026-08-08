@@ -53,18 +53,29 @@ def render_page(context: UIContext, response: str = "") -> bytes:
             identifier = html.escape(str(card["id"]), quote=True)
             reasons = html.escape("; ".join(str(item) for item in card["compatibility_reasons"]))
             action = "<strong>Automatic install blocked: unverified.</strong>"
-            if card["status"] == "verified":
+            if card["status"] == "verified" or card["provider"] == "ollama":
+                activation_note = (
+                    "<p><strong>Activation remains blocked until this runtime contract is "
+                    "verified.</strong></p>"
+                    if card["status"] != "verified"
+                    else ""
+                )
                 action = (
                     '<form method="post" action="/api/models/install">'
                     f'<input type="hidden" name="model_id" value="{identifier}">'
                     '<input type="hidden" name="confirm" value="yes">'
-                    "<button>Install with confirmation</button></form>"
+                    "<button onclick=\"return confirm('Install this model from its official source?')\">"
+                    "Install</button></form>"
+                    '<form method="post" action="/api/models/verify">'
+                    f'<input type="hidden" name="model_id" value="{identifier}">'
+                    "<button>Verify</button></form>"
                     '<form method="post" action="/api/models/test">'
                     f'<input type="hidden" name="model_id" value="{identifier}">'
                     "<button>Test</button></form>"
+                    f"{activation_note}"
                 )
             cards.append(
-                f'<article class="card"><h3>{identifier}</h3><p>{card["purpose"]} via '
+                f'<article class="card" data-category="{html.escape(str(card["purpose"]))}"><h3>{identifier}</h3><p>{card["purpose"]} via '
                 f"{card['provider']} · {card['status']}</p><p>{card['download_size_mb']} MB · "
                 f'{card["minimum_ram_mb"]} MB RAM</p><p>{reasons}</p><p><a rel="noreferrer" '
                 f'href="{html.escape(str(card["source_url"]), quote=True)}">Official source</a> · '
@@ -113,7 +124,7 @@ It is not a medical device, does not diagnose conditions, and is not an emergenc
 <form method="post" action="/api/message"><label for="message">How can I support you?</label>
 <textarea id="message" name="message" required maxlength="4000"></textarea><button>Send</button></form>
 {reply}</section><section id="setup"><h2>Setup dashboard</h2>{setup_html}<p><a href="/api/setup/status">Export setup status</a>. Simulator is the safe default.</p></section>
-<section id="models"><h2>Models</h2><div class="grid">{models_html}</div><h3>Installation progress</h3>{progress_html}<p>State survives refresh. Unknown totals are shown as indeterminate.</p></section>
+<section id="models"><h2>Models</h2><p><strong>Categories:</strong> LLM · STT · TTS · wake word</p><div class="grid">{models_html}</div><h3>Installation progress</h3>{progress_html}<p>State survives refresh. Unknown totals are shown as indeterminate.</p></section>
 <section id="voice"><h2>Voice setup</h2><p>Microphone recording is off until explicitly tested. Temporary audio is deleted. Configure explicit local STT/TTS executables and models; no voice or actor is cloned.</p></section>
 <section id="robot"><h2>Robot setup</h2><p>Simulator expressions and safe-stop are supported. Physical Reachy connection and all movement controls remain disabled pending verified official SDK integration and supervised review.</p></section>
 <section id="configuration"><h2>Configuration</h2><p>Active mode: {html.escape(context.mode)} · model provider: {html.escape(context.backend)} · voice: {html.escape(context.voice)} · robot: {html.escape(context.robot)}.</p><p>Use <code>baymax config show</code> for the redacted configuration. Model activation validates and tests every selection before applying it; rollback always requires confirmation.</p></section>
@@ -189,7 +200,7 @@ def create_handler(
                     self._send(output.read_bytes(), content_type="application/json; charset=utf-8")
             elif path == "/api/models" and context.model_manager:
                 self._json({"models": context.model_manager.cards()})
-            elif path == "/api/models/status" and context.model_manager:
+            elif path in {"/api/models/status", "/api/models/progress"} and context.model_manager:
                 self._json(context.model_manager.progress())
             elif path == "/api/setup/status" and context.model_manager:
                 self._json(context.model_manager.setup_status())
@@ -201,8 +212,14 @@ def create_handler(
         def do_POST(self) -> None:
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if length < 1 or length > MAX_REQUEST_BYTES:
-                    raise ValueError("Request is empty or too large")
+                if length < 1:
+                    raise ValueError("Request is empty")
+                if length > MAX_REQUEST_BYTES:
+                    self._json(
+                        {"ok": False, "error": "Request exceeds the 16384-byte limit"},
+                        HTTPStatus.REQUEST_ENTITY_TOO_LARGE,
+                    )
+                    return
                 raw = self.rfile.read(length)
                 if self.headers.get("Content-Type", "").startswith("application/json"):
                     values = json.loads(raw)
@@ -229,17 +246,36 @@ def create_handler(
                     confirmed = values.get("confirm") in {True, "yes", "true"}
                     context.model_manager.start_install(identifier, confirmed=confirmed)
                     result = "Installation started"
-                elif path == "/api/models/status" and context.model_manager:
-                    action = values.get("action")
+                elif (
+                    path
+                    in {
+                        "/api/models/status",
+                        "/api/models/pause",
+                        "/api/models/resume",
+                        "/api/models/cancel",
+                        "/api/models/retry",
+                    }
+                    and context.model_manager
+                ):
+                    action = (
+                        path.rsplit("/", 1)[-1]
+                        if path != "/api/models/status"
+                        else values.get("action")
+                    )
                     if not isinstance(action, str):
                         raise ValueError("action is required")
                     context.model_manager.control(action)
                     result = f"Installation {action} requested"
+                elif path == "/api/models/verify" and context.model_manager:
+                    identifier = values.get("model_id")
+                    if not isinstance(identifier, str):
+                        raise ValueError("model_id is required")
+                    result = context.model_manager.verify(identifier)
                 elif path == "/api/models/test" and context.model_manager:
                     identifier = values.get("model_id")
                     if not isinstance(identifier, str):
                         raise ValueError("model_id is required")
-                    result = json.dumps(context.model_manager.test(identifier))
+                    result = context.model_manager.test(identifier)
                 elif path == "/api/models/activate" and context.model_manager:
                     if values.get("confirm") not in {True, "yes", "true"}:
                         raise ValueError("activation requires confirmation")
@@ -248,11 +284,11 @@ def create_handler(
                         for role in ("llm", "stt", "tts", "wake_word")
                         if isinstance((value := values.get(role, "")), str)
                     }
-                    result = json.dumps(context.model_manager.activate(selected))
+                    result = context.model_manager.activate(selected)
                 elif path == "/api/models/rollback" and context.model_manager:
                     if values.get("confirm") not in {True, "yes", "true"}:
                         raise ValueError("rollback requires confirmation")
-                    result = json.dumps(context.model_manager.rollback())
+                    result = context.model_manager.rollback()
                 elif path == "/api/reminders":
                     result = self._tool("create_reminder", values)
                 elif path == "/api/mood":
@@ -262,13 +298,25 @@ def create_handler(
                 else:
                     self._json({"error": "Page not found"}, HTTPStatus.NOT_FOUND)
                     return
-            except (ValueError, TypeError, RuntimeError, json.JSONDecodeError) as exc:
-                self._json({"error": str(exc)}, HTTPStatus.BAD_REQUEST)
+            except KeyError as exc:
+                self._json({"ok": False, "error": str(exc)}, HTTPStatus.NOT_FOUND)
+                return
+            except PermissionError as exc:
+                self._json({"ok": False, "error": str(exc)}, HTTPStatus.FORBIDDEN)
+                return
+            except FileNotFoundError as exc:
+                self._json({"ok": False, "error": str(exc)}, HTTPStatus.CONFLICT)
+                return
+            except RuntimeError as exc:
+                self._json({"ok": False, "error": str(exc)}, HTTPStatus.CONFLICT)
+                return
+            except (ValueError, TypeError, json.JSONDecodeError) as exc:
+                self._json({"ok": False, "error": str(exc)}, HTTPStatus.BAD_REQUEST)
                 return
             if self.headers.get("Accept", "").startswith("application/json") or self.headers.get(
                 "Content-Type", ""
             ).startswith("application/json"):
-                self._json({"result": result})
+                self._json({"ok": True, "result": result})
             else:
                 self._send(render_page(context, result))
 
