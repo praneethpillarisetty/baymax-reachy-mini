@@ -1,6 +1,8 @@
 [baymax]
-mode = "standalone"
+mode = "laptop"
 llm_backend = "litert"
 fallback_llm_backend = "mock"
+voice_mode = "console"
+robot_backend = "simulator"
 asr_backend = "mock"
 tts_backend = "console"

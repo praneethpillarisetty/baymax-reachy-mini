@@ -77,6 +77,8 @@ def test_ui_api_health_safety_and_wellness(tmp_path: Path):
         health = _request(url, "/api/health")
         assert health["bind_host"] == "127.0.0.1"
         assert health["backend"] == "mock"
+        assert health["voice"] == "mock"
+        assert health["robot"]["backend"] == "simulator"
         assert _request(url, "/api/message", {"message": "hello"})["result"].startswith(
             "I hear you"
         )
@@ -91,6 +93,7 @@ def test_ui_api_health_safety_and_wellness(tmp_path: Path):
         assert "logged" in _request(url, "/api/hydration", {"milliliters": 250})["result"]
         summary = _request(url, "/api/wellness")["result"]
         assert "mood: 1" in summary and "hydration_ml: 1" in summary
+        assert _request(url, "/api/safe-stop", {})["result"] == "Safe stop engaged"
     finally:
         server.shutdown()
         server.server_close()

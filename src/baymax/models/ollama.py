@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import threading
 import time
 from urllib import error, request
 
@@ -24,10 +25,13 @@ class OllamaModel:
     ):
         self.url, self.model, self.timeout = url.rstrip("/"), model, timeout
         self.context_length, self.temperature, self.retries = context_length, temperature, retries
+        self.cancelled = threading.Event()
 
     def _request(self, path: str, body: bytes | None = None) -> dict:
         last_error: Exception | None = None
         for attempt in range(self.retries + 1):
+            if self.cancelled.is_set():
+                raise OllamaConnectionError("Ollama request cancelled by safe stop")
             req = request.Request(f"{self.url}{path}", body, {"Content-Type": "application/json"})
             try:
                 with request.urlopen(req, timeout=self.timeout) as response:
@@ -64,6 +68,7 @@ class OllamaModel:
         return True, f"Ollama is reachable and configured model {self.model!r} is installed"
 
     def generate(self, text: str, system_prompt: str) -> ModelResponse:
+        self.cancelled.clear()
         body = json.dumps(
             {
                 "model": self.model,
@@ -81,3 +86,7 @@ class OllamaModel:
             return parse_model_response(result["message"]["content"])
         except (KeyError, TypeError, ValueError) as exc:
             raise ValueError("Ollama returned an invalid structured response") from exc
+
+    def cancel(self) -> None:
+        """Prevent retries; urllib cannot abort an already-running socket portably."""
+        self.cancelled.set()

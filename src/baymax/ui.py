@@ -22,6 +22,8 @@ class UIContext:
     app: Any
     backend: str = "mock"
     mode: str = "simulator"
+    voice: str = "mock"
+    robot: str = "simulator"
 
 
 def render_page(context: UIContext, response: str = "") -> bytes:
@@ -41,7 +43,8 @@ textarea{{min-height:6rem}} button{{padding:.7rem 1.2rem;font:inherit;background
 small{{color:#536d76}}
 </style></head><body><main><h1>Baymax Companion</h1>
 <p><small>Local wellness companion — not a medical device or emergency service.</small></p>
-<p><strong>Backend:</strong> {html.escape(context.backend)} · <strong>Robot:</strong> {html.escape(context.mode)}</p>
+<p><strong>Mode:</strong> {html.escape(context.mode)} · <strong>Model:</strong> {html.escape(context.backend)} · <strong>Voice:</strong> {html.escape(context.voice)} · <strong>Robot:</strong> {html.escape(context.robot)}</p>
+<form method="post" action="/api/safe-stop"><button>Safe stop</button></form>
 <form method="post" action="/api/message"><label for="message">How can I support you?</label>
 <textarea id="message" name="message" required maxlength="4000"></textarea><button>Send</button></form>
 {reply}<h2>Wellness tools</h2><div class="grid">
@@ -53,9 +56,10 @@ small{{color:#536d76}}
 
 
 def create_handler(
-    app: Any, *, backend: str = "mock", mode: str = "simulator"
+    app: Any, *, backend: str = "mock", mode: str = "simulator", voice: str = "mock",
+    robot: str = "simulator",
 ) -> type[BaseHTTPRequestHandler]:
-    context = UIContext(app, backend, mode)
+    context = UIContext(app, backend, mode, voice, robot)
 
     class UIHandler(BaseHTTPRequestHandler):
         def _send(
@@ -95,6 +99,8 @@ def create_handler(
                         "model_available": model_ok,
                         "model_detail": detail,
                         "bind_host": UI_HOST,
+                        "voice": context.voice,
+                        "robot": context.app.robot.status(),
                     }
                 )
             elif path == "/api/reminders":
@@ -130,6 +136,9 @@ def create_handler(
                     if not isinstance(message, str) or not message.strip() or len(message) > 4000:
                         raise ValueError("Message is empty or too large")
                     result = context.app.handle(message.strip()).message
+                elif path == "/api/safe-stop":
+                    context.app.safe_stop()
+                    result = "Safe stop engaged"
                 elif path == "/api/reminders":
                     result = self._tool("create_reminder", values)
                 elif path == "/api/mood":
@@ -162,8 +171,12 @@ def run_ui(
     *,
     backend: str = "mock",
     mode: str = "simulator",
+    voice: str = "mock",
+    robot: str = "simulator",
 ) -> None:
-    server = ThreadingHTTPServer((UI_HOST, port), create_handler(app, backend=backend, mode=mode))
+    server = ThreadingHTTPServer(
+        (UI_HOST, port), create_handler(app, backend=backend, mode=mode, voice=voice, robot=robot)
+    )
     url = f"http://{UI_HOST}:{server.server_port}/"
     print(f"Baymax UI: {url} (press Ctrl+C to stop)")
     if open_browser:

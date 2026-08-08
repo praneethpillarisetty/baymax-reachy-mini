@@ -29,6 +29,27 @@ def test_non_loopback_ollama_requires_opt_in(monkeypatch):
         raise AssertionError("LAN URL was accepted implicitly")
 
 
+def test_runtime_environment_and_redacted_paths(tmp_path, monkeypatch):
+    monkeypatch.setenv("BAYMAX_DATA_DIR", str(tmp_path / "private"))
+    monkeypatch.setenv("LITERT_TOKENIZER_PATH", str(tmp_path / "tokenizer"))
+    monkeypatch.setenv("BAYMAX_LOG_LEVEL", "debug")
+    settings = Settings.from_env()
+    assert settings.database_path == tmp_path / "private/data/baymax.sqlite3"
+    assert settings.log_level == "debug"
+    assert settings.public_dict()["data_dir"] == "<redacted-path>"
+    assert settings.public_dict()["litert_tokenizer_path"] == "<redacted-path>"
+
+
+def test_dotenv_is_optional_and_environment_wins(tmp_path, monkeypatch):
+    env_file = tmp_path / ".env"
+    env_file.write_text("BAYMAX_MODE=laptop\nBAYMAX_LOG_LEVEL=WARNING\n")
+    monkeypatch.setenv("BAYMAX_ENV_FILE", str(env_file))
+    monkeypatch.setenv("BAYMAX_MODE", "simulator")
+    settings = Settings.from_env()
+    assert settings.mode == "simulator"
+    assert settings.log_level == "WARNING"
+
+
 def test_versioned_profile_roundtrip(tmp_path):
     output = tmp_path / "profile.zip"
     export_profile(

@@ -44,7 +44,7 @@ def build_model(settings: Settings, name: str):
 
 
 def build_app(settings: Settings) -> ConversationOrchestrator:
-    if settings.mode == "reachy":
+    if settings.robot_backend == "reachy":
         raise RuntimeError(
             "Reachy hardware mode is locked until the official adapter passes supervised validation"
         )
@@ -98,6 +98,7 @@ def parser() -> argparse.ArgumentParser:
     benchmark.add_argument("model", type=Path)
     benchmark.add_argument("--label", required=True)
     commands.add_parser("robot-smoke").add_argument("--confirm-supervised", action="store_true")
+    commands.add_parser("robot-status")
     commands.add_parser("safe-stop")
     ui = commands.add_parser("ui")
     ui.add_argument("--port", type=int, default=8765)
@@ -219,6 +220,12 @@ def main(argv: list[str] | None = None) -> int:
             robot.shutdown()
         print("Supervised Reachy Mini connection and safe shutdown passed.")
         return 0
+    if args.command == "robot-status":
+        status_robot = (
+            ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
+        )
+        print(json.dumps(status_robot.status(), indent=2))
+        return 0
     if args.command == "voice-test":
         backend = (
             settings.asr_backend
@@ -261,9 +268,13 @@ def main(argv: list[str] | None = None) -> int:
                 not args.no_browser,
                 backend=settings.llm_backend,
                 mode=settings.mode,
+                voice=settings.voice_mode,
+                robot=settings.robot_backend,
             )
             return 0
         if args.command == "safe-stop":
+            app.safe_stop()
+            print("Safe stop engaged; model cancellation requested and expressions disabled.")
             return 0
         if args.once is not None:
             app.handle(args.once)
