@@ -52,6 +52,24 @@ laptop_recommendation = "candidate pending runtime verification"
 raspberry_pi_recommendation = "not automatically recommended"
 status = "unverified"
 
+[whisper-cpp-tiny-en]
+purpose = "stt"
+provider = "executable"
+source_url = "https://github.com/ggerganov/whisper.cpp"
+license_url = "https://github.com/ggerganov/whisper.cpp/blob/master/LICENSE"
+checksum = ""
+operating_systems = "linux,darwin,windows"
+architectures = "x86_64,amd64,aarch64,arm64"
+minimum_ram_mb = 1024
+minimum_disk_mb = 256
+download_size_mb = 75
+runtime_adapter = "baymax.voice.local.CommandASR"
+installation_method = "manual official whisper.cpp instructions after confirmation"
+verification_method = "executable/model validation and bounded synthetic WAV"
+laptop_recommendation = "lightweight option"
+raspberry_pi_recommendation = "recommended lightweight local option"
+status = "unverified"
+
 [piper-en-us-lessac-medium]
 purpose = "tts"
 provider = "huggingface"

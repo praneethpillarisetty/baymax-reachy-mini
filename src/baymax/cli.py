@@ -348,7 +348,12 @@ def main(argv: list[str] | None = None) -> int:
                     file=sys.stderr,
                 )
                 return 1
-        print(f"{args.component} adapter health check passed ({backend}); no audio was retained")
+        detail = (
+            "bounded synthetic text preflight passed; temporary output cleanup is enabled"
+            if args.component == "tts"
+            else "microphone preflight passed; recordings are bounded and not retained"
+        )
+        print(f"{args.component} adapter health check passed ({backend}); {detail}")
         return 0
     app = build_app(settings)
     try:

@@ -40,9 +40,9 @@ def run_doctor(settings: Settings) -> list[Check]:
     checks = [
         Check(
             "python",
-            "pass" if (3, 10) <= sys.version_info[:2] < (3, 14) else "fail",
+            "pass" if (3, 10) <= sys.version_info[:2] < (3, 15) else "fail",
             platform.python_version(),
-            "Install 64-bit Python 3.10-3.13.",
+            "Install 64-bit Python 3.10-3.14.",
         ),
         Check("operating system", "pass", platform.system() or "unknown"),
         Check("cpu architecture", "pass", platform.machine() or "unknown"),
