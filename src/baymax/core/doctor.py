@@ -5,8 +5,8 @@ import importlib.util
 import json
 import platform
 import shutil
-import sys
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from typing import Literal
 
