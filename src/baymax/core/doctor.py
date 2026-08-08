@@ -5,8 +5,8 @@ import importlib.util
 import json
 import platform
 import shutil
-import sys
 import sqlite3
+import sys
 from dataclasses import asdict, dataclass
 from typing import Literal
 
@@ -138,7 +138,7 @@ def run_doctor(settings: Settings) -> list[Check]:
                     f"{adapter.profile.id}: model and tokenizer found",
                 )
             )
-        except Exception as exc:  # noqa: BLE001: LiteRT adapter may raise varied runtime errors; doctor must remain resilient here
+        except Exception as exc:  # noqa: BLE001 -- optional LiteRT runtimes vary
             checks.append(
                 Check(
                     "LiteRT profile/files",
