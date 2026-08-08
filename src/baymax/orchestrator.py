@@ -15,6 +15,7 @@ class ConversationOrchestrator:
         if not isinstance(text, str) or not text.strip() or len(text) > MAX_MESSAGE_CHARS:
             raise ValueError("message must contain 1-4000 characters")
         response = self.safety.check(text)
+        emergency = response is not None
         if response is None:
             try:
                 response = self.model.generate(text, self.system_prompt)
@@ -39,10 +40,12 @@ class ConversationOrchestrator:
             response = ModelResponse(
                 response.message + "\n" + "\n".join(results), emotion=response.emotion
             )
-        try:
-            self.robot.express(response.emotion)
-        except (RuntimeError, OSError):
-            pass
+        # Emergency guidance must never cause physical movement. Text/audio remains available.
+        if not emergency:
+            try:
+                self.robot.express(response.emotion)
+            except (RuntimeError, OSError):
+                pass
         try:
             self.tts.speak(response.message)
         except (RuntimeError, OSError):

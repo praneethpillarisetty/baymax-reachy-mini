@@ -8,6 +8,7 @@ from pathlib import Path
 from .config import Settings
 from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .core.diagnostics import export_diagnostics
+from .core.readiness import capability_report
 from .core.transfer import export_profile, import_profile
 from .memory import LocalStore
 from .models.capabilities import detect_capabilities, evaluate, recommended_target
@@ -353,6 +354,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.command == "robot-status":
         status_robot = ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
         status = status_robot.status()
+        status["capability_report"] = capability_report(
+            settings, robot_connected=bool(status.get("connected"))
+        )
         status["readiness"] = {
             "connection_mode": settings.reachy_connection_mode,
             "supervised_confirmation": settings.reachy_supervised,
