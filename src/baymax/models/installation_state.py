@@ -7,8 +7,17 @@ from pathlib import Path
 from typing import Literal
 
 Stage = Literal[
-    "idle", "checking", "downloading", "paused", "verifying", "installing", "testing",
-    "activating", "complete", "cancelled", "failed",
+    "idle",
+    "checking",
+    "downloading",
+    "paused",
+    "verifying",
+    "installing",
+    "testing",
+    "activating",
+    "complete",
+    "cancelled",
+    "failed",
 ]
 
 
@@ -41,7 +50,8 @@ class InstallationStateStore:
             return InstallationProgress(**json.loads(self.path.read_text(encoding="utf-8")))
         except (OSError, TypeError, ValueError, json.JSONDecodeError):
             return InstallationProgress(
-                stage="failed", error="installation state is damaged",
+                stage="failed",
+                error="installation state is damaged",
                 recovery="Retry the operation; the partial model file is preserved.",
             )
 
@@ -50,4 +60,3 @@ class InstallationStateStore:
         temporary = self.path.with_suffix(".tmp")
         temporary.write_text(json.dumps(asdict(progress), indent=2), encoding="utf-8")
         os.replace(temporary, self.path)
-

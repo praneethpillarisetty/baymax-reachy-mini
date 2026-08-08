@@ -48,8 +48,14 @@ class ModelManager:
                     "compatibility_reasons": compatibility.reasons,
                     "installed": card.installation_method == "built-in",
                     "active": card.id in self.activation.active().values(),
-                    "operation_active": progress.stage in {
-                        "checking", "downloading", "verifying", "installing", "testing", "activating",
+                    "operation_active": progress.stage
+                    in {
+                        "checking",
+                        "downloading",
+                        "verifying",
+                        "installing",
+                        "testing",
+                        "activating",
                     },
                 }
             )
@@ -123,7 +129,8 @@ class ModelManager:
         except (OSError, RuntimeError, ValueError):
             self.state.save(
                 InstallationProgress(
-                    stage="failed", error="activation failed",
+                    stage="failed",
+                    error="activation failed",
                     recovery="The previous configuration remains active. Correct the model and retry.",
                 )
             )

@@ -269,8 +269,12 @@ def test_voice_and_robot_failures_preserve_text_response(tmp_path):
     robot = FailedRobot()
     robot.start()
     companion = ConversationOrchestrator(
-        MockModel(), SafetyEngine(), ToolExecutor(LocalStore(tmp_path / "fail.sqlite")),
-        robot, FailedOutput(), "kind",
+        MockModel(),
+        SafetyEngine(),
+        ToolExecutor(LocalStore(tmp_path / "fail.sqlite")),
+        robot,
+        FailedOutput(),
+        "kind",
     )
     assert "hello" in companion.handle("hello").message
 

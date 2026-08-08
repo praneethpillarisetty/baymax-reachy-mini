@@ -16,9 +16,15 @@ SUPPORTED_ROBOT_BACKENDS = {"simulator", "reachy"}
 SUPPORTED_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 SECRET_MARKERS = ("KEY", "TOKEN", "PASSWORD", "SECRET")
 SENSITIVE_PATH_FIELDS = {
-    "asr_executable", "asr_model_path", "tts_executable", "tts_model_path",
-    "litert_model_path", "litert_tokenizer_path", "litert_model_profile",
-    "data_dir", "database_path",
+    "asr_executable",
+    "asr_model_path",
+    "tts_executable",
+    "tts_model_path",
+    "litert_model_path",
+    "litert_tokenizer_path",
+    "litert_model_profile",
+    "data_dir",
+    "database_path",
 }
 
 
@@ -105,7 +111,10 @@ class Settings:
                 values[setting_name] = os.environ[env]
         # Backwards-compatible aliases; the documented unprefixed variables take priority.
         for setting_name in (
-            "asr_executable", "asr_model_path", "tts_executable", "tts_model_path"
+            "asr_executable",
+            "asr_model_path",
+            "tts_executable",
+            "tts_model_path",
         ):
             old = f"BAYMAX_{setting_name.upper()}"
             if setting_name not in values and old in os.environ:
@@ -179,8 +188,11 @@ class Settings:
 
     def public_dict(self) -> dict[str, Any]:
         return {
-            key: "<redacted-path>" if key in SENSITIVE_PATH_FIELDS and value is not None
-            else str(value) if isinstance(value, Path) else value
+            key: "<redacted-path>"
+            if key in SENSITIVE_PATH_FIELDS and value is not None
+            else str(value)
+            if isinstance(value, Path)
+            else value
             for key, value in asdict(self).items()
             if not any(key.upper().endswith(marker) for marker in SECRET_MARKERS)
         }

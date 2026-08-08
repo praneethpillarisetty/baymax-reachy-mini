@@ -7,8 +7,8 @@ from urllib.request import Request, urlopen
 
 from baymax.contracts import ModelResponse
 from baymax.memory import LocalStore
-from baymax.models.mock import MockModel
 from baymax.models.manager import ModelManager
+from baymax.models.mock import MockModel
 from baymax.orchestrator import ConversationOrchestrator
 from baymax.robot.simulator import SimulatorRobot
 from baymax.safety import SafetyEngine
@@ -105,13 +105,15 @@ def test_setup_dashboard_and_progress_survive_refresh(tmp_path: Path):
     robot = SimulatorRobot()
     robot.start()
     app = ConversationOrchestrator(
-        MockModel(), SafetyEngine(), ToolExecutor(LocalStore(tmp_path / "models.sqlite")),
-        robot, ConsoleTTS(), "test",
+        MockModel(),
+        SafetyEngine(),
+        ToolExecutor(LocalStore(tmp_path / "models.sqlite")),
+        robot,
+        ConsoleTTS(),
+        "test",
     )
     manager = ModelManager(tmp_path / "data")
-    server = ThreadingHTTPServer(
-        ("127.0.0.1", 0), create_handler(app, model_manager=manager)
-    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(app, model_manager=manager))
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
     url = f"http://127.0.0.1:{server.server_port}"
@@ -126,9 +128,7 @@ def test_setup_dashboard_and_progress_survive_refresh(tmp_path: Path):
         first = _request(url, "/api/models/status")
         second = _request(url, "/api/models/status")
         assert first == second and first["stage"] == "idle"
-        result = _request(
-            url, "/api/models/install", {"model_id": "mock-llm", "confirm": True}
-        )
+        result = _request(url, "/api/models/install", {"model_id": "mock-llm", "confirm": True})
         assert result["result"] == "Installation started"
         assert _request(url, "/api/models/status")["stage"] == "complete"
     finally:

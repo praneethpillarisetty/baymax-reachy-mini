@@ -69,8 +69,10 @@ class ReachyMiniRobot:
 
     def status(self) -> dict[str, Any]:
         return {
-            "backend": "reachy", "connected": self.connected,
-            "motion_stopped": self.stop_event.is_set(), "sdk_import_available": self.sdk_available(),
+            "backend": "reachy",
+            "connected": self.connected,
+            "motion_stopped": self.stop_event.is_set(),
+            "sdk_import_available": self.sdk_available(),
             "motion_enabled": False,
             "capabilities": ["supervised-integration-placeholder", "fail-closed-safe-stop"],
         }

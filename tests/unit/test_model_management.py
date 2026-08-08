@@ -1,22 +1,32 @@
-from dataclasses import replace
 import hashlib
 import io
+from dataclasses import replace
 from pathlib import Path
 
-from baymax.models.capabilities import SystemCapabilities, evaluate, recommended_target
 from baymax.models.activation import ModelActivation
+from baymax.models.capabilities import SystemCapabilities, evaluate, recommended_target
 from baymax.models.installation_state import InstallationStateStore
 from baymax.models.installer import ModelInstaller
 from baymax.models.registry import RuntimeModelRegistry
-
 
 REGISTRY = Path("config/model-registry.toml")
 
 
 def capabilities(**changes):
     base = SystemCapabilities(
-        "linux", "aarch64", "3.12", 8192, 20_000, "none", "none", "not probed",
-        "not probed", False, False, False, "not probed",
+        "linux",
+        "aarch64",
+        "3.12",
+        8192,
+        20_000,
+        "none",
+        "none",
+        "not probed",
+        "not probed",
+        False,
+        False,
+        False,
+        "not probed",
     )
     return replace(base, **changes)
 
@@ -39,11 +49,16 @@ def test_capability_rejections_explain_ram_disk_and_architecture():
 
 def test_platform_target_detection():
     assert recommended_target(capabilities()) == "raspberry-pi"
-    assert recommended_target(capabilities(operating_system="windows", architecture="amd64")) == "laptop"
+    assert (
+        recommended_target(capabilities(operating_system="windows", architecture="amd64"))
+        == "laptop"
+    )
 
 
 class Response(io.BytesIO):
-    headers = {}
+    def __init__(self, value: bytes):
+        super().__init__(value)
+        self.headers: dict[str, str] = {}
 
     def __enter__(self):
         return self
@@ -55,8 +70,11 @@ class Response(io.BytesIO):
 def downloadable(payload=b"complete model"):
     base = RuntimeModelRegistry(REGISTRY).require("faster-whisper-small")
     return replace(
-        base, provider="direct_file", source_url="https://official.invalid/model",
-        checksum=hashlib.sha256(payload).hexdigest(), status="verified",
+        base,
+        provider="direct_file",
+        source_url="https://official.invalid/model",
+        checksum=hashlib.sha256(payload).hexdigest(),
+        status="verified",
     )
 
 
@@ -88,7 +106,8 @@ def test_resumable_download_uses_partial_and_verifies(tmp_path):
 def test_checksum_failure_preserves_partial_for_retry(tmp_path):
     card = replace(downloadable(), checksum="0" * 64)
     installer = ModelInstaller(
-        tmp_path, InstallationStateStore(tmp_path / "state.json"),
+        tmp_path,
+        InstallationStateStore(tmp_path / "state.json"),
         lambda req, timeout: Response(b"wrong"),
     )
     try:
@@ -107,7 +126,8 @@ def test_existing_valid_file_is_never_overwritten(tmp_path):
     destination.parent.mkdir(parents=True)
     destination.write_bytes(payload)
     installer = ModelInstaller(
-        tmp_path, InstallationStateStore(tmp_path / "state.json"),
+        tmp_path,
+        InstallationStateStore(tmp_path / "state.json"),
         lambda req, timeout: (_ for _ in ()).throw(AssertionError("download attempted")),
     )
     assert installer.install_file(downloadable(payload)) == destination
@@ -115,7 +135,8 @@ def test_existing_valid_file_is_never_overwritten(tmp_path):
 
 def test_installation_cancellation_preserves_partial(tmp_path):
     installer = ModelInstaller(
-        tmp_path, InstallationStateStore(tmp_path / "state.json"),
+        tmp_path,
+        InstallationStateStore(tmp_path / "state.json"),
         lambda req, timeout: Response(b"complete model"),
     )
     installer.cancel()

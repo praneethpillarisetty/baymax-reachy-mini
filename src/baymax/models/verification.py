@@ -48,18 +48,20 @@ def verify_ollama_cli(model_name: str, timeout: float = 10) -> VerificationResul
     names = {line.split()[0] for line in result.stdout.splitlines()[1:] if line.split()}
     return VerificationResult(
         model_name in names,
-        "model appears in ollama list" if model_name in names else "model is absent from ollama list",
+        "model appears in ollama list"
+        if model_name in names
+        else "model is absent from ollama list",
     )
 
 
 def write_manifest(path: Path, card: ModelCard, artifact: Path | None) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     value = {
-        "schema": 1, "model": asdict(card),
+        "schema": 1,
+        "model": asdict(card),
         "artifact": artifact.name if artifact else None,
         "verified_sha256": sha256(artifact) if artifact and artifact.is_file() else None,
     }
     temporary = path.with_suffix(".tmp")
     temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
     temporary.replace(path)
-

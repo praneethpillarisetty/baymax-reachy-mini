@@ -9,10 +9,10 @@ from .config import Settings
 from .core.doctor import doctor_exit_code, format_checks, run_doctor
 from .core.transfer import export_profile, import_profile
 from .memory import LocalStore
-from .models.litert import LiteRTModel
 from .models.capabilities import detect_capabilities, evaluate, recommended_target
 from .models.installation_state import InstallationStateStore
 from .models.installer import ModelInstaller
+from .models.litert import LiteRTModel
 from .models.manager import ModelManager
 from .models.mock import MockModel
 from .models.ollama import OllamaModel
@@ -216,7 +216,8 @@ def main(argv: list[str] | None = None) -> int:
             registry = RuntimeModelRegistry(args.registry)
             capabilities = detect_capabilities(settings.data_dir)
             target = (
-                recommended_target(capabilities) if getattr(args, "target", "auto") == "auto"
+                recommended_target(capabilities)
+                if getattr(args, "target", "auto") == "auto"
                 else args.target
             )
             installer = ModelInstaller(
@@ -267,7 +268,9 @@ def main(argv: list[str] | None = None) -> int:
                 json.dumps(
                     manager.activate(
                         {
-                            "llm": args.llm, "stt": args.stt, "tts": args.tts,
+                            "llm": args.llm,
+                            "stt": args.stt,
+                            "tts": args.tts,
                             "wake_word": args.wake_word,
                         }
                     ),
@@ -314,9 +317,7 @@ def main(argv: list[str] | None = None) -> int:
         print("Supervised Reachy Mini connection and safe shutdown passed.")
         return 0
     if args.command == "robot-status":
-        status_robot = (
-            ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
-        )
+        status_robot = ReachyMiniRobot() if settings.robot_backend == "reachy" else SimulatorRobot()
         print(json.dumps(status_robot.status(), indent=2))
         return 0
     if args.command == "voice-test":

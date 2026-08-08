@@ -38,6 +38,8 @@ class SimulatorRobot:
 
     def status(self) -> dict[str, Any]:
         return {
-            "backend": "simulator", "connected": self.started,
-            "motion_stopped": self.stop_event.is_set(), "capabilities": ["expressions", "safe-stop"],
+            "backend": "simulator",
+            "connected": self.started,
+            "motion_stopped": self.stop_event.is_set(),
+            "capabilities": ["expressions", "safe-stop"],
         }

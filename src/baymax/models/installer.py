@@ -3,10 +3,13 @@ from __future__ import annotations
 import os
 import threading
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from pathlib import Path
-from typing import BinaryIO, Callable, Protocol
+from typing import BinaryIO, Protocol
 from urllib import request
+
+from typing_extensions import Self
 
 from .capabilities import SystemCapabilities, evaluate
 from .installation_state import InstallationProgress, InstallationStateStore, Stage
@@ -16,8 +19,9 @@ from .verification import verify_file, write_manifest
 
 class DownloadResponse(Protocol):
     headers: object
+
     def read(self, size: int = -1) -> bytes: ...
-    def __enter__(self) -> DownloadResponse: ...
+    def __enter__(self) -> Self: ...
     def __exit__(self, *args: object) -> None: ...
 
 
@@ -33,9 +37,7 @@ class InstallationPlan:
 
 
 class ModelInstaller:
-    def __init__(
-        self, data_dir: Path, state: InstallationStateStore, opener: Opener | None = None
-    ):
+    def __init__(self, data_dir: Path, state: InstallationStateStore, opener: Opener | None = None):
         self.data_dir, self.state = data_dir, state
         self.opener = opener or (lambda req, timeout: request.urlopen(req, timeout=timeout))
         self.pause_event, self.cancel_event = threading.Event(), threading.Event()
@@ -47,7 +49,8 @@ class ModelInstaller:
         selected, warnings = [], []
         for card in cards:
             recommendation = (
-                card.raspberry_pi_recommendation if target == "raspberry-pi"
+                card.raspberry_pi_recommendation
+                if target == "raspberry-pi"
                 else card.laptop_recommendation
             )
             compatibility = evaluate(card, capabilities)
@@ -96,23 +99,32 @@ class ModelInstaller:
             os.replace(partial, destination)
             write_manifest(destination.parent / "manifest.json", card, destination)
             self.state.save(
-                InstallationProgress(card.id, "complete", destination.stat().st_size,
-                                     destination.stat().st_size)
+                InstallationProgress(
+                    card.id, "complete", destination.stat().st_size, destination.stat().st_size
+                )
             )
             return destination
         except Exception as exc:
             stage: Stage = "cancelled" if self.cancel_event.is_set() else "failed"
             self.state.save(
                 InstallationProgress(
-                    card.id, stage, partial.stat().st_size if partial.exists() else offset,
-                    error=str(exc), recovery="Retry to resume the preserved .partial file.",
+                    card.id,
+                    stage,
+                    partial.stat().st_size if partial.exists() else offset,
+                    error=str(exc),
+                    recovery="Retry to resume the preserved .partial file.",
                 )
             )
             raise
 
     def _copy(
-        self, response: DownloadResponse, output: BinaryIO, card: ModelCard,
-        offset: int, started: float, total: int | None,
+        self,
+        response: DownloadResponse,
+        output: BinaryIO,
+        card: ModelCard,
+        offset: int,
+        started: float,
+        total: int | None,
     ) -> None:
         downloaded = offset
         while chunk := response.read(64 * 1024):
@@ -127,7 +139,11 @@ class ModelInstaller:
             elapsed = max(time.monotonic() - started, 0.001)
             speed = max((downloaded - offset) / elapsed, 0.001)
             current = InstallationProgress(
-                card.id, "downloading", downloaded, total, speed,
+                card.id,
+                "downloading",
+                downloaded,
+                total,
+                speed,
                 (total - downloaded) / speed if total else None,
             )
             self.state.save(replace(current))

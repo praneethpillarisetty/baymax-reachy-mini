@@ -46,9 +46,17 @@ def detect_capabilities(data_dir: Path) -> SystemCapabilities:
     usage = shutil.disk_usage(data_dir)
     litert = any(importlib.util.find_spec(name) for name in ("ai_edge_litert", "tflite_runtime"))
     return SystemCapabilities(
-        platform.system().lower(), platform.machine().lower(), platform.python_version(), _ram_mb(),
-        usage.free // 1_048_576, "not detected", "not detected", "not probed",
-        "not probed", shutil.which("ollama") is not None, litert,
+        platform.system().lower(),
+        platform.machine().lower(),
+        platform.python_version(),
+        _ram_mb(),
+        usage.free // 1_048_576,
+        "not detected",
+        "not detected",
+        "not probed",
+        "not probed",
+        shutil.which("ollama") is not None,
+        litert,
         importlib.util.find_spec("reachy_mini") is not None,
         "not probed (downloads require explicit confirmation)",
     )
@@ -80,7 +88,10 @@ def evaluate(card: ModelCard, capabilities: SystemCapabilities) -> Compatibility
 
 
 def recommended_target(capabilities: SystemCapabilities) -> str:
-    if capabilities.operating_system == "linux" and capabilities.architecture in {"aarch64", "arm64"}:
+    if capabilities.operating_system == "linux" and capabilities.architecture in {
+        "aarch64",
+        "arm64",
+    }:
         return "raspberry-pi"
     if sys.platform == "win32" or capabilities.operating_system in {"windows", "linux", "darwin"}:
         return "laptop"

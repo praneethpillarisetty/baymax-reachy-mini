@@ -36,13 +36,15 @@ class ModelCard:
         def text(name: str) -> str:
             item = value.get(name)
             if not isinstance(item, str):
-                raise ValueError(f"model {identifier}: {name} must be text")
+                raise TypeError(f"model {identifier}: {name} must be text")
             return item
 
         def integer(name: str) -> int:
             item = value.get(name)
-            if not isinstance(item, int) or isinstance(item, bool) or item < 0:
-                raise ValueError(f"model {identifier}: {name} must be a non-negative integer")
+            if not isinstance(item, int) or isinstance(item, bool):
+                raise TypeError(f"model {identifier}: {name} must be an integer")
+            if item < 0:
+                raise ValueError(f"model {identifier}: {name} must be non-negative")
             return item
 
         purpose, provider, status = text("purpose"), text("provider"), text("status")
@@ -53,13 +55,21 @@ class ModelCard:
         if status not in {"verified", "unverified"}:
             raise ValueError(f"model {identifier}: invalid status")
         return cls(
-            identifier, cast(ModelPurpose, purpose), cast(ModelProvider, provider),
-            text("source_url"), text("license_url"),
-            text("checksum"), tuple(text("operating_systems").split(",")),
-            tuple(text("architectures").split(",")), integer("minimum_ram_mb"),
-            integer("minimum_disk_mb"), integer("download_size_mb"),
-            text("runtime_adapter"), text("installation_method"),
-            text("verification_method"), text("laptop_recommendation"),
+            identifier,
+            cast(ModelPurpose, purpose),
+            cast(ModelProvider, provider),
+            text("source_url"),
+            text("license_url"),
+            text("checksum"),
+            tuple(text("operating_systems").split(",")),
+            tuple(text("architectures").split(",")),
+            integer("minimum_ram_mb"),
+            integer("minimum_disk_mb"),
+            integer("download_size_mb"),
+            text("runtime_adapter"),
+            text("installation_method"),
+            text("verification_method"),
+            text("laptop_recommendation"),
             text("raspberry_pi_recommendation"),
             cast(Literal["verified", "unverified"], status),
         )
@@ -71,7 +81,10 @@ class RuntimeModelRegistry:
 
     def models(self) -> dict[str, ModelCard]:
         data = load_toml(self.path)
-        return {identifier: ModelCard.from_table(identifier, table) for identifier, table in data.items()}
+        return {
+            identifier: ModelCard.from_table(identifier, table)
+            for identifier, table in data.items()
+        }
 
     def require(self, identifier: str) -> ModelCard:
         try:

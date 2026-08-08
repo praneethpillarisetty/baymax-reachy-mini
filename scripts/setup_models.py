@@ -4,7 +4,6 @@ import argparse
 
 from baymax.cli import main
 
-
 parser = argparse.ArgumentParser(description="Plan or confirm Baymax local model setup")
 parser.add_argument("--target", choices=("auto", "laptop", "raspberry-pi"), default="auto")
 parser.add_argument("--dry-run", action="store_true")

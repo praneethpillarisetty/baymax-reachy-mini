@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 import os
 import shutil
+from collections.abc import Callable
 from pathlib import Path
-from typing import Callable
 
 from .registry import RuntimeModelRegistry
 
@@ -13,7 +13,9 @@ ProviderTest = Callable[[str], bool]
 
 class ModelActivation:
     def __init__(
-        self, data_dir: Path, registry: RuntimeModelRegistry,
+        self,
+        data_dir: Path,
+        registry: RuntimeModelRegistry,
         provider_test: ProviderTest | None = None,
     ):
         self.directory = data_dir / "config"
@@ -26,7 +28,9 @@ class ModelActivation:
         if not self.active_path.is_file():
             return {"llm": "mock-llm", "stt": "", "tts": "", "wake_word": ""}
         value = json.loads(self.active_path.read_text(encoding="utf-8"))
-        if not isinstance(value, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+        if not isinstance(value, dict) or not all(
+            isinstance(k, str) and isinstance(v, str) for k, v in value.items()
+        ):
             raise ValueError("active model configuration is invalid")
         return value
 

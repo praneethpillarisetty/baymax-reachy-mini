@@ -58,18 +58,18 @@ def render_page(context: UIContext, response: str = "") -> bytes:
                     '<form method="post" action="/api/models/install">'
                     f'<input type="hidden" name="model_id" value="{identifier}">'
                     '<input type="hidden" name="confirm" value="yes">'
-                    '<button>Install with confirmation</button></form>'
+                    "<button>Install with confirmation</button></form>"
                     '<form method="post" action="/api/models/test">'
                     f'<input type="hidden" name="model_id" value="{identifier}">'
-                    '<button>Test</button></form>'
+                    "<button>Test</button></form>"
                 )
             cards.append(
                 f'<article class="card"><h3>{identifier}</h3><p>{card["purpose"]} via '
-                f'{card["provider"]} · {card["status"]}</p><p>{card["download_size_mb"]} MB · '
+                f"{card['provider']} · {card['status']}</p><p>{card['download_size_mb']} MB · "
                 f'{card["minimum_ram_mb"]} MB RAM</p><p>{reasons}</p><p><a rel="noreferrer" '
                 f'href="{html.escape(str(card["source_url"]), quote=True)}">Official source</a> · '
                 f'<a rel="noreferrer" href="{html.escape(str(card["license_url"]), quote=True)}">'
-                f'License</a></p>{action}</article>'
+                f"License</a></p>{action}</article>"
             )
         models_html = "".join(cards)
         progress = context.model_manager.progress()
@@ -85,10 +85,14 @@ def render_page(context: UIContext, response: str = "") -> bytes:
             '<button name="action" value="cancel">Cancel</button> '
             '<button name="action" value="retry">Retry</button></form>'
         )
-        events_html = "".join(
-            f"<li><strong>{html.escape(event['level'])}</strong>: "
-            f"{html.escape(event['message'])}</li>" for event in context.model_manager.events
-        ) or "<li>No setup events.</li>"
+        events_html = (
+            "".join(
+                f"<li><strong>{html.escape(event['level'])}</strong>: "
+                f"{html.escape(event['message'])}</li>"
+                for event in context.model_manager.events
+            )
+            or "<li>No setup events.</li>"
+        )
     return f"""<!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
 <title>Baymax Companion</title><style>
@@ -122,8 +126,13 @@ It is not a medical device, does not diagnose conditions, and is not an emergenc
 
 
 def create_handler(
-    app: Any, *, backend: str = "mock", mode: str = "simulator", voice: str = "mock",
-    robot: str = "simulator", model_manager: ModelManager | None = None,
+    app: Any,
+    *,
+    backend: str = "mock",
+    mode: str = "simulator",
+    voice: str = "mock",
+    robot: str = "simulator",
+    model_manager: ModelManager | None = None,
 ) -> type[BaseHTTPRequestHandler]:
     context = UIContext(app, backend, mode, voice, robot, model_manager)
 
@@ -235,7 +244,8 @@ def create_handler(
                     if values.get("confirm") not in {True, "yes", "true"}:
                         raise ValueError("activation requires confirmation")
                     selected = {
-                        role: value for role in ("llm", "stt", "tts", "wake_word")
+                        role: value
+                        for role in ("llm", "stt", "tts", "wake_word")
                         if isinstance((value := values.get(role, "")), str)
                     }
                     result = json.dumps(context.model_manager.activate(selected))
@@ -280,10 +290,15 @@ def run_ui(
     model_manager: ModelManager | None = None,
 ) -> None:
     server = ThreadingHTTPServer(
-        (UI_HOST, port), create_handler(
-            app, backend=backend, mode=mode, voice=voice, robot=robot,
+        (UI_HOST, port),
+        create_handler(
+            app,
+            backend=backend,
+            mode=mode,
+            voice=voice,
+            robot=robot,
             model_manager=model_manager,
-        )
+        ),
     )
     url = f"http://{UI_HOST}:{server.server_port}/"
     print(f"Baymax UI: {url} (press Ctrl+C to stop)")

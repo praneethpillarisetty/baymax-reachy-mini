@@ -4,6 +4,7 @@ import zipfile
 from baymax.cli import main
 from baymax.config import Settings
 from baymax.core.transfer import export_profile, import_profile
+from baymax.memory import LocalStore
 from baymax.platform.linux_arm64 import validate_linux_arm64
 from baymax.platform.windows import application_directories
 
@@ -156,6 +157,4 @@ def test_cli_profile_import_writes_settings_and_selected_reminders(tmp_path, mon
         == 0
     )
     assert json.loads(settings_output.read_text())["system_prompt"] == "Patient"
-    from baymax.memory import LocalStore
-
     assert LocalStore(database).reminder_definitions()[0]["title"] == "Water"

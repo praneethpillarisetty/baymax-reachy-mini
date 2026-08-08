@@ -1,5 +1,6 @@
 import pytest
 
+from baymax.cli import main
 from baymax.robot.reachy_mini import ReachyConnectionError, ReachyMiniRobot
 
 
@@ -28,8 +29,6 @@ def test_reachy_choreography_is_allow_listed_and_cancellable():
 
 
 def test_robot_smoke_requires_explicit_confirmation(tmp_path, monkeypatch):
-    from baymax.cli import main
-
     monkeypatch.setenv("DATABASE_PATH", str(tmp_path / "db.sqlite3"))
     assert main(["robot-smoke"]) == 2
     assert main(["robot-smoke", "--confirm-supervised"]) == 1
