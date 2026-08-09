@@ -79,6 +79,12 @@ def test_ui_api_health_safety_and_wellness(tmp_path: Path):
         assert health["bind_host"] == "127.0.0.1"
         assert health["backend"] == "mock"
         assert health["voice"] == "mock"
+        assert health["asr_available"] is False
+        assert health["asr_provider_selected"] is False
+        assert health["asr_detail"] == "configured but real voice is disabled"
+        assert health["tts_available"] is False
+        assert health["tts_provider_selected"] is False
+        assert health["tts_detail"] == "configured but real voice is disabled"
         assert health["robot"]["backend"] == "simulator"
         assert _request(url, "/api/message", {"message": "hello"})["result"].startswith(
             "I hear you"
