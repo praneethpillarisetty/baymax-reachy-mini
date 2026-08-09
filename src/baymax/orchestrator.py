@@ -16,20 +16,33 @@ class ConversationOrchestrator:
             raise ValueError("message must contain 1-4000 characters")
         response = self.safety.check(text)
         emergency = response is not None
+        backend = "safety" if emergency else self._backend_name(self.model)
+        fallback_reason = None
         if response is None:
             try:
                 response = self.model.generate(text, self.system_prompt)
-            except Exception:  # noqa: BLE001 -- model adapters have diverse optional runtime errors
+            except Exception as exc:  # noqa: BLE001 -- adapters have diverse optional errors
+                fallback_reason = self._safe_failure_reason(exc)
                 if self.fallback_model is not None:
                     try:
                         response = self.fallback_model.generate(text, self.system_prompt)
+                        backend = self._backend_name(self.fallback_model)
                     except Exception:  # noqa: BLE001 -- fallback adapters also have optional runtimes
                         response = self._failure()
+                        backend = "failure"
                 else:
                     response = self._failure()
+                    backend = "failure"
         if not isinstance(response, ModelResponse):
             response = parse_model_response(response)
         response = self.safety.enforce_output(response)
+        response = ModelResponse(
+            response.message,
+            response.actions,
+            response.emotion,
+            backend,
+            fallback_reason,
+        )
         results = []
         for action in response.actions:
             try:
@@ -38,7 +51,10 @@ class ConversationOrchestrator:
                 results.append(f"Action failed: {exc}")
         if results:
             response = ModelResponse(
-                response.message + "\n" + "\n".join(results), emotion=response.emotion
+                response.message + "\n" + "\n".join(results),
+                emotion=response.emotion,
+                backend=response.backend,
+                fallback_reason=response.fallback_reason,
             )
         # Emergency guidance must never cause physical movement. Text/audio remains available.
         if not emergency:
@@ -51,6 +67,16 @@ class ConversationOrchestrator:
         except (RuntimeError, OSError):
             pass  # Text response remains available when local voice fails.
         return response
+
+    @staticmethod
+    def _backend_name(model) -> str:
+        return str(getattr(model, "backend_name", model.__class__.__name__.removesuffix("Model"))).lower()
+
+    @staticmethod
+    def _safe_failure_reason(exc: Exception) -> str:
+        """Return bounded adapter diagnostics without prompts, payloads, or chained exceptions."""
+        detail = " ".join(str(exc).split())
+        return (detail or f"{type(exc).__name__} while generating")[:200]
 
     def safe_stop(self) -> None:
         """Stop/cancel output before any lower-priority expression work."""

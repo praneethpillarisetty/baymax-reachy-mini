@@ -2,6 +2,8 @@ from ..contracts import ModelResponse
 
 
 class MockModel:
+    backend_name = "mock"
+
     def health_check(self) -> tuple[bool, str]:
         return True, "built-in deterministic mock model"
 

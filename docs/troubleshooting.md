@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Run `baymax doctor`, or `baymax doctor --json` for machine-readable diagnostics, then `baymax config validate`. A LAN Ollama rejection requires an explicit opt-in and firewall review. An unavailable Ollama model falls back to mock when configured. LiteRT errors name missing profile/model/tokenizer or unsupported architecture. Database errors usually indicate parent-directory permissions. For audio failure, switch to mock/console and inspect device permissions/formats.
+Run `baymax doctor`, or `baymax doctor --json` for machine-readable diagnostics, then `baymax config validate`. One-shot conversations report the backend that produced the response and either `Fallback: none` or a bounded fallback reason; use `baymax --once "hello" --json` for the same metadata as JSON. A LAN Ollama rejection requires an explicit opt-in and firewall review. An unavailable or invalidly structured Ollama response falls back to mock when configured without exposing prompts. LiteRT errors name missing profile/model/tokenizer or unsupported architecture. Database errors usually indicate parent-directory permissions. For audio failure, switch to mock/console and inspect device permissions/formats.
 
 Use `baymax config show` to confirm redacted effective settings, `baymax robot-status` without a
 connection attempt, and `baymax safe-stop` whenever output should be cancelled. If local voice

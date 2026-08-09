@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import argparse
+import io
 import json
 import sys
+from contextlib import redirect_stdout
 from pathlib import Path
 
 from .config import Settings
@@ -76,6 +78,7 @@ def parser() -> argparse.ArgumentParser:
     root = argparse.ArgumentParser(prog="baymax")
     root.add_argument("--config", type=Path)
     root.add_argument("--once")
+    root.add_argument("--json", action="store_true", dest="response_json")
     commands = root.add_subparsers(dest="command")
     doctor = commands.add_parser("doctor")
     doctor.add_argument("--json", action="store_true")
@@ -436,7 +439,33 @@ def main(argv: list[str] | None = None) -> int:
             print("Safe stop engaged; model cancellation requested and expressions disabled.")
             return 0
         if args.once is not None:
-            app.handle(args.once)
+            if args.response_json:
+                # Console TTS must not corrupt the machine-readable response stream.
+                with redirect_stdout(io.StringIO()):
+                    response = app.handle(args.once)
+            else:
+                response = app.handle(args.once)
+            if args.response_json:
+                print(
+                    json.dumps(
+                        {
+                            "message": response.message,
+                            "emotion": response.emotion,
+                            "actions": [
+                                {"tool": action.tool, "arguments": action.arguments}
+                                for action in response.actions
+                            ],
+                            "backend": response.backend,
+                            "fallback_reason": response.fallback_reason,
+                        }
+                    )
+                )
+            else:
+                print(f"Backend: {response.backend}")
+                if response.fallback_reason is None:
+                    print("Fallback: none")
+                else:
+                    print(f"Fallback reason: {response.fallback_reason}")
             return 0
         while (text := input("You: ").strip()) not in {"quit", "exit"}:
             app.handle(text)

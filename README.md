@@ -17,7 +17,8 @@ Configuration is read from `--config FILE`, optional `.env`, and then environmen
 
 ## Commands
 
-* `baymax --once "hello"` / `baymax` — mock simulator conversation.
+* `baymax --once "hello"` / `baymax` — conversation with backend/fallback diagnostics; add
+  `--json` to a one-shot request for machine-readable output.
 * `baymax doctor [--json]`, `baymax config show`, `baymax config validate` — actionable cross-platform diagnostics.
 * `baymax data export --output data.json`, `baymax data delete --yes` — local-data controls.
 * `baymax export --output profile.zip [--include-reminders]`, `baymax import --input profile.zip --settings-output imported.json` — checksummed versioned transfer with v1 migration.

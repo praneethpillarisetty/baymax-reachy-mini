@@ -15,6 +15,8 @@ class ModelResponse:
     message: str
     actions: tuple[ActionRequest, ...] = ()
     emotion: str = "neutral"
+    backend: str = "unknown"
+    fallback_reason: str | None = None
 
 
 class ConversationModel(Protocol):

@@ -64,7 +64,10 @@ def test_emergency_bypasses_model(tmp_path, text):
 
 def test_llm_failure_and_fallback(tmp_path):
     assert "trouble" in app(tmp_path, Broken()).handle("hello").message
-    assert "hello" in app(tmp_path, Broken(), MockModel()).handle("hello").message
+    result = app(tmp_path, Broken(), MockModel()).handle("hello")
+    assert "hello" in result.message
+    assert result.backend == "mock"
+    assert result.fallback_reason == "offline"
 
 
 def test_prohibited_medical_advice_is_replaced(tmp_path):

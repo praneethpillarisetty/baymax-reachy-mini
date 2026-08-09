@@ -80,3 +80,29 @@ def test_safe_stop_cancels_ollama_before_request():
         else:
             raise AssertionError("cancelled request was sent")
     opened.assert_not_called()
+
+
+def test_generate_requests_schema_and_parses_structured_response():
+    model = adapter()
+    with patch.object(
+        model,
+        "_request",
+        return_value={"message": {"content": '{"message":"hello","emotion":"greeting"}'}},
+    ) as requested:
+        response = model.generate("hello", "Be kind.")
+
+    assert response.message == "hello"
+    body = json.loads(requested.call_args.args[1])
+    assert body["format"]["required"] == ["message"]
+    assert "Respond only with a JSON object" in body["messages"][0]["content"]
+
+
+def test_generate_reports_invalid_structured_json():
+    model = adapter()
+    with patch.object(model, "_request", return_value={"message": {"content": "not json"}}):
+        try:
+            model.generate("hello", "Be kind.")
+        except ValueError as exc:
+            assert str(exc) == "Ollama returned invalid structured JSON"
+        else:
+            raise AssertionError("invalid model output accepted")
