@@ -1,10 +1,29 @@
 from __future__ import annotations
 
+import logging
 from collections.abc import Callable
 from typing import Any
 
 from ..contracts import ActionRequest
 from ..memory import LocalStore
+
+LOGGER = logging.getLogger(__name__)
+
+# This is the complete model-facing action allow-list. Keep it explicit so structured-output
+# adapters cannot advertise arbitrary robot methods or model-invented tool names.
+MODEL_ACTION_NAMES = (
+    "create_reminder",
+    "schedule_medication_reminder",
+    "list_reminders",
+    "complete_reminder",
+    "mood_check_in",
+    "log_hydration",
+    "add_appointment_note",
+    "create_appointment",
+    "add_wellness_note",
+    "wellness_summary",
+    "breath",
+)
 
 
 class ToolArgumentTypeError(TypeError, ValueError):
@@ -12,7 +31,7 @@ class ToolArgumentTypeError(TypeError, ValueError):
 
 
 class ToolExecutor:
-    def __init__(self, store: LocalStore):
+    def __init__(self, store: LocalStore, *, simulator_mode: bool = False):
         self.store = store
         self._tools: dict[str, Callable[[dict[str, Any]], str]] = {
             "create_reminder": self.create_reminder,
@@ -26,11 +45,22 @@ class ToolExecutor:
             "add_wellness_note": self.add_wellness_note,
             "wellness_summary": self.wellness_summary,
         }
+        # `breath` is deliberately absent outside the simulator. It never delegates to a Robot
+        # and therefore cannot become an indirect physical-motion command.
+        if simulator_mode:
+            self._tools["breath"] = self.breath
 
     def execute(self, action: ActionRequest) -> str:
         if action.tool not in self._tools:
             raise ValueError(f"tool is not allowed: {action.tool}")
         return self._tools[action.tool](action.arguments)
+
+    def breath(self, args: dict[str, Any]) -> str:
+        """A logged simulator-only no-op; no robot object or motion API is reachable here."""
+        if args:
+            raise ValueError("breath does not accept arguments")
+        LOGGER.info("simulator action executed: breath (no physical movement)")
+        return "Breathing exercise acknowledged"
 
     def create_reminder(self, args: dict[str, Any]) -> str:
         title, when = args.get("title"), args.get("when")

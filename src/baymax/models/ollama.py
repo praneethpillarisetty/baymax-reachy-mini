@@ -8,6 +8,7 @@ from pathlib import Path
 from urllib import error, request
 
 from ..contracts import ModelResponse
+from ..tools import MODEL_ACTION_NAMES
 from .base import parse_model_response
 
 
@@ -139,7 +140,10 @@ class OllamaModel:
                             "items": {
                                 "type": "object",
                                 "properties": {
-                                    "tool": {"type": "string"},
+                                    "tool": {
+                                        "type": "string",
+                                        "enum": list(MODEL_ACTION_NAMES),
+                                    },
                                     "arguments": {"type": "object"},
                                 },
                                 "required": ["tool"],
@@ -153,7 +157,9 @@ class OllamaModel:
                         "role": "system",
                         "content": system_prompt
                         + " Respond only with a JSON object containing a string 'message', "
-                        "an optional supported 'emotion', and an optional 'actions' array.",
+                        "an optional supported 'emotion', and an optional 'actions' array. "
+                        "Do not request an action unless it is necessary for the user's request. "
+                        "The breath action is a harmless no-op available only in simulator mode.",
                     },
                     {"role": "user", "content": text},
                 ],
