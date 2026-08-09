@@ -70,7 +70,9 @@ class ConversationOrchestrator:
 
     @staticmethod
     def _backend_name(model) -> str:
-        return str(getattr(model, "backend_name", model.__class__.__name__.removesuffix("Model"))).lower()
+        return str(
+            getattr(model, "backend_name", model.__class__.__name__.removesuffix("Model"))
+        ).lower()
 
     @staticmethod
     def _safe_failure_reason(exc: Exception) -> str:

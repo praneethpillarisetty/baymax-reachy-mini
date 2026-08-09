@@ -66,7 +66,10 @@ def build_app(settings: Settings) -> ConversationOrchestrator:
     return ConversationOrchestrator(
         build_model(settings, settings.llm_backend),
         SafetyEngine(),
-        ToolExecutor(LocalStore(settings.database_path)),
+        ToolExecutor(
+            LocalStore(settings.database_path),
+            simulator_mode=settings.mode == "simulator" and settings.robot_backend == "simulator",
+        ),
         robot,
         tts,
         settings.system_prompt,

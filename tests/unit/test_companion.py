@@ -31,7 +31,7 @@ def app(tmp_path, model=None, fallback=None):
     return ConversationOrchestrator(
         model or MockModel(),
         SafetyEngine(),
-        ToolExecutor(LocalStore(tmp_path / "db.sqlite")),
+        ToolExecutor(LocalStore(tmp_path / "db.sqlite"), simulator_mode=True),
         robot,
         tts,
         "kind",
@@ -134,6 +134,8 @@ def test_ollama_mock_server_tags_and_chat_contract():
         assert model.health_check()[0]
         assert model.generate("hello", "safe").message == "ok"
         assert seen[0]["stream"] is False and seen[0]["model"] == "local:test"
+        tool_schema = seen[0]["format"]["properties"]["actions"]["items"]["properties"]["tool"]
+        assert "breath" in tool_schema["enum"]
     finally:
         server.shutdown()
         server.server_close()
@@ -159,6 +161,36 @@ def test_action_failure_is_truthful(tmp_path):
             return ModelResponse("Done", (ActionRequest("create_reminder", {}),))
 
     assert "Action failed" in app(tmp_path, M()).handle("x").message
+
+
+def test_ollama_greeting_with_breath_has_no_visible_action_failure(tmp_path):
+    class Greeting:
+        backend_name = "ollama"
+
+        def generate(self, *_):
+            return ModelResponse("Hello! How are you feeling today?", (ActionRequest("breath"),))
+
+    result = app(tmp_path, Greeting()).handle("hello")
+    assert result.backend == "ollama"
+    assert "Action failed" not in result.message
+    assert "Breathing exercise acknowledged" in result.message
+
+
+def test_breath_is_validated_logged_and_harmless_in_simulator(tmp_path, caplog):
+    tools = ToolExecutor(LocalStore(tmp_path / "d"), simulator_mode=True)
+    with caplog.at_level("INFO", logger="baymax.tools.executor"):
+        assert tools.execute(ActionRequest("breath")) == "Breathing exercise acknowledged"
+    assert "no physical movement" in caplog.text
+    with pytest.raises(ValueError, match="does not accept arguments"):
+        tools.execute(ActionRequest("breath", {"duration": 10}))
+
+
+def test_unknown_action_and_physical_breath_are_fail_closed(tmp_path):
+    physical_tools = ToolExecutor(LocalStore(tmp_path / "d"), simulator_mode=False)
+    with pytest.raises(ValueError, match="tool is not allowed: dance"):
+        physical_tools.execute(ActionRequest("dance"))
+    with pytest.raises(ValueError, match="tool is not allowed: breath"):
+        physical_tools.execute(ActionRequest("breath"))
 
 
 def profile(tmp_path: Path):
