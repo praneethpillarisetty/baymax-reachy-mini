@@ -28,6 +28,7 @@ from .safety import SafetyEngine
 from .tools import ToolExecutor
 from .ui import run_ui
 from .voice.providers import build_recognizer, build_synthesizer
+from .voice.setup import VoiceModelSetup
 from .voice.tts import ConsoleTTS
 
 
@@ -447,6 +448,7 @@ def main(argv: list[str] | None = None) -> int:
                 recognizer=build_recognizer(settings),
                 synthesizer=build_synthesizer(settings),
                 model_manager=ModelManager(settings.data_dir),
+                voice_setup=VoiceModelSetup(settings.data_dir),
             )
             return 0
         if args.command == "safe-stop":
