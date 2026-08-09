@@ -16,6 +16,8 @@ class OllamaConnectionError(RuntimeError):
 
 
 class OllamaModel:
+    backend_name = "ollama"
+
     def __init__(
         self,
         url: str,
@@ -127,9 +129,32 @@ class OllamaModel:
             {
                 "model": self.model,
                 "stream": False,
-                "format": "json",
+                "format": {
+                    "type": "object",
+                    "properties": {
+                        "message": {"type": "string"},
+                        "emotion": {"type": "string"},
+                        "actions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "tool": {"type": "string"},
+                                    "arguments": {"type": "object"},
+                                },
+                                "required": ["tool"],
+                            },
+                        },
+                    },
+                    "required": ["message"],
+                },
                 "messages": [
-                    {"role": "system", "content": system_prompt},
+                    {
+                        "role": "system",
+                        "content": system_prompt
+                        + " Respond only with a JSON object containing a string 'message', "
+                        "an optional supported 'emotion', and an optional 'actions' array.",
+                    },
                     {"role": "user", "content": text},
                 ],
                 "options": {"num_ctx": self.context_length, "temperature": self.temperature},
@@ -142,7 +167,7 @@ class OllamaModel:
                 raise TypeError("message is not an object")
             return parse_model_response(message["content"])
         except (KeyError, TypeError, ValueError) as exc:
-            raise ValueError("Ollama returned an invalid structured response") from exc
+            raise ValueError("Ollama returned invalid structured JSON") from exc
 
     def cancel(self) -> None:
         """Prevent retries; urllib cannot abort an already-running socket portably."""
