@@ -7,9 +7,10 @@ import os
 import shutil
 import threading
 import wave
+from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 from urllib import request
 
 from ..config import default_data_dir
@@ -29,8 +30,7 @@ STT_URLS = tuple(
 )
 TTS_URLS = (
     f"{HF_ROOT}/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
-    f"{HF_ROOT}/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/"
-    "en_US-lessac-medium.onnx.json",
+    f"{HF_ROOT}/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
 )
 
 
