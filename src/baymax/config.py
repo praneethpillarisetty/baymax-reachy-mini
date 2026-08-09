@@ -12,6 +12,8 @@ from .core.toml import load_toml
 SUPPORTED_MODES = {"simulator", "laptop", "reachy"}
 SUPPORTED_BACKENDS = {"mock", "ollama", "litert"}
 SUPPORTED_VOICE_MODES = {"mock", "console", "local"}
+SUPPORTED_ASR_BACKENDS = {"mock", "faster-whisper", "local-command"}
+SUPPORTED_TTS_BACKENDS = {"console", "mock", "piper", "local-command"}
 SUPPORTED_ROBOT_BACKENDS = {"simulator", "reachy"}
 SUPPORTED_LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 SECRET_MARKERS = ("KEY", "TOKEN", "PASSWORD", "SECRET")
@@ -190,6 +192,10 @@ class Settings:
             errors.append("invalid fallback backend")
         if self.voice_mode not in SUPPORTED_VOICE_MODES:
             errors.append(f"voice mode must be one of {sorted(SUPPORTED_VOICE_MODES)}")
+        if self.asr_backend not in SUPPORTED_ASR_BACKENDS:
+            errors.append(f"ASR backend must be one of {sorted(SUPPORTED_ASR_BACKENDS)}")
+        if self.tts_backend not in SUPPORTED_TTS_BACKENDS:
+            errors.append(f"TTS backend must be one of {sorted(SUPPORTED_TTS_BACKENDS)}")
         if self.robot_backend not in SUPPORTED_ROBOT_BACKENDS:
             errors.append(f"robot backend must be one of {sorted(SUPPORTED_ROBOT_BACKENDS)}")
         if self.mode == "reachy" and self.robot_backend != "reachy":

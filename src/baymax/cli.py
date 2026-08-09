@@ -28,6 +28,7 @@ from .safety import SafetyEngine
 from .tools import ToolExecutor
 from .ui import run_ui
 from .voice.tts import ConsoleTTS
+from .voice.providers import build_recognizer, build_synthesizer
 
 
 def build_model(settings: Settings, name: str):
@@ -145,7 +146,9 @@ def parser() -> argparse.ArgumentParser:
     ui.add_argument("--port", type=int, default=8765)
     ui.add_argument("--no-browser", action="store_true")
     voice_test = commands.add_parser("voice-test")
-    voice_test.add_argument("component", choices=("microphone", "speaker", "asr", "tts"))
+    voice_test.add_argument(
+        "component", choices=("microphone", "speaker", "asr", "tts", "end-to-end")
+    )
     return root
 
 
@@ -386,6 +389,12 @@ def main(argv: list[str] | None = None) -> int:
         print("Safe stop engaged; movement remains disabled and the adapter is shut down.")
         return 0
     if args.command == "voice-test":
+        if args.component == "end-to-end":
+            recognizer, synthesizer = build_recognizer(settings), build_synthesizer(settings)
+            asr_ok, asr_detail = recognizer.health_check()
+            tts_ok, tts_detail = synthesizer.health_check()
+            print(f"ASR: {asr_detail}\nTTS: {tts_detail}")
+            return 0 if asr_ok and tts_ok else 1
         backend = (
             settings.asr_backend
             if args.component in {"microphone", "asr"}
@@ -434,6 +443,9 @@ def main(argv: list[str] | None = None) -> int:
                 mode=settings.mode,
                 voice=settings.voice_mode,
                 robot=settings.robot_backend,
+                model=settings.ollama_model if settings.llm_backend == "ollama" else "built-in",
+                recognizer=build_recognizer(settings),
+                synthesizer=build_synthesizer(settings),
                 model_manager=ModelManager(settings.data_dir),
             )
             return 0
