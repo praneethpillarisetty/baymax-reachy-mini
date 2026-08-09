@@ -32,7 +32,6 @@ class ConversationOrchestrator:
                         backend = "failure"
                 else:
                     response = self._failure()
-                    backend = "failure"
         if not isinstance(response, ModelResponse):
             response = parse_model_response(response)
         response = self.safety.enforce_output(response)
