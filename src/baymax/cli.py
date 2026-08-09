@@ -27,8 +27,8 @@ from .robot.simulator import SimulatorRobot
 from .safety import SafetyEngine
 from .tools import ToolExecutor
 from .ui import run_ui
-from .voice.tts import ConsoleTTS
 from .voice.providers import build_recognizer, build_synthesizer
+from .voice.tts import ConsoleTTS
 
 
 def build_model(settings: Settings, name: str):

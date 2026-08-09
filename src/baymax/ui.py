@@ -260,7 +260,7 @@ def create_handler(
                     },
                     HTTPStatus.BAD_REQUEST,
                 )
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 -- final HTTP boundary returns adapter failures
                 self._json(
                     {
                         "ok": False,
