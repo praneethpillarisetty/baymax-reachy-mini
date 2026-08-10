@@ -9,7 +9,7 @@ description = "Local-first wellness companion shared core and platform adapters"
 readme = "README.md"
 requires-python = ">=3.10,<3.15"
 license = {text = "MIT"}
-dependencies = ["typing-extensions>=4.4"]
+dependencies = ["typing-extensions>=4.4", "tomli>=2,<3; python_version < '3.11'"]
 
 [project.optional-dependencies]
 core = []

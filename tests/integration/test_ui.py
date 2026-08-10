@@ -1,6 +1,8 @@
 import json
+import hashlib
 import threading
-from http.server import ThreadingHTTPServer
+import time
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
@@ -15,6 +17,8 @@ from baymax.safety import SafetyEngine
 from baymax.tools import ToolExecutor
 from baymax.ui import create_handler
 from baymax.voice.tts import ConsoleTTS
+from baymax.voice.download import DownloadManager
+from baymax.voice.setup import VoiceModelSetup
 
 
 class FakeApp:
@@ -141,3 +145,74 @@ def test_setup_dashboard_and_progress_survive_refresh(tmp_path: Path):
         server.shutdown()
         server.server_close()
         thread.join(timeout=2)
+
+
+def test_voice_install_endpoint_uses_confirmed_manifest_request(tmp_path: Path):
+    payload = b"local fixture"
+    download_server = ThreadingHTTPServer(("127.0.0.1", 0), _FixtureDownloadHandler)
+    _FixtureDownloadHandler.payload = payload
+    download_thread = threading.Thread(target=download_server.serve_forever, daemon=True)
+    download_thread.start()
+    manifest = tmp_path / "voice.toml"
+    manifest.write_text(
+        f'''manifest_version = 1
+[[models]]
+id = "faster-whisper-small"
+purpose = "stt"
+provider = "faster-whisper"
+source_url = "https://example.test/card"
+license_url = "https://example.test/license"
+recommended_storage = "fixture"
+automatic_download_allowed = true
+activation_allowed = true
+[[models.files]]
+name = "model.bin"
+url = "http://127.0.0.1:{download_server.server_port}/model"
+sha256 = "{hashlib.sha256(payload).hexdigest()}"
+''',
+        encoding="utf-8",
+    )
+    root = tmp_path / "data" / "models" / "voice"
+    setup = VoiceModelSetup(
+        tmp_path / "data",
+        manifest_path=manifest,
+        download_manager=DownloadManager(root, allow_http_for_tests=True),
+    )
+    server = ThreadingHTTPServer(("127.0.0.1", 0), create_handler(FakeApp(), voice_setup=setup))
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    url = f"http://127.0.0.1:{server.server_port}"
+    try:
+        detail = _request(url, "/api/voice/status/stt")
+        result = _request(
+            url,
+            "/api/voice/install/stt",
+            {"model_id": detail["model_id"], "confirm": True},
+        )
+        assert result["operation"] == "download" and result["state"] == "downloading"
+        for _ in range(50):
+            if _request(url, "/api/voice/progress")["stage"] == "verified":
+                break
+            time.sleep(0.02)
+        assert (setup.stt_path / "model.bin").read_bytes() == payload
+        assert _request(url, "/api/voice/verify/stt", {})["verified"] is True
+    finally:
+        server.shutdown()
+        download_server.shutdown()
+        server.server_close()
+        download_server.server_close()
+        thread.join(timeout=2)
+        download_thread.join(timeout=2)
+
+
+class _FixtureDownloadHandler(BaseHTTPRequestHandler):
+    payload = b""
+
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header("Content-Length", str(len(self.payload)))
+        self.end_headers()
+        self.wfile.write(self.payload)
+
+    def log_message(self, _format, *_args):
+        return

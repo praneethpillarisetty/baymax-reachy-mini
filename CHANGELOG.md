@@ -22,3 +22,9 @@
 
 - Added simulator-first local companion architecture, safety, structured local tools, SQLite, model/audio/robot adapters, tests, benchmark skeleton, and deployment documentation.
 - Physical Reachy Mini and exact LiteRT candidates remain unverified due to source-network restrictions.
+
+## Phase 7 voice download repair - 2026-08-10
+
+- Added an authoritative voice manifest and application-data-only reusable DownloadManager.
+- Repaired confirmed browser install requests, visible JSON errors/progress, verification/activation gates, and separate voice controls.
+- Documented conservative Laptop, Reachy Lite, Wireless, and CM4 compatibility boundaries.

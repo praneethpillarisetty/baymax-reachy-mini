@@ -1,0 +1,3 @@
+# Security and privacy
+
+Voice assets are allow-listed, HTTPS-only, size-bounded, stored in application data, and atomically promoted after verification. Browser forms cannot choose download URLs or automatically apply environment variables. Credentials, tokens, audio, passwords, and SSH secrets must not enter source or diagnostics. Audio is local by default and temporary server audio is deleted. LAN Ollama and all deployment changes are opt-in. Model output is untrusted; actions remain allow-listed, bounded, watched, and safe-stop protected. Baymax is not a medical device and cannot diagnose or provide emergency response.

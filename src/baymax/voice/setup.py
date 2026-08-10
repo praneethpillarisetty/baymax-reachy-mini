@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import hashlib
+import importlib
 import importlib.util
 import json
 import os
 import shutil
+import sys
 import threading
 import wave
 from collections.abc import Callable
@@ -12,8 +14,12 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 from urllib import request
+from urllib.error import URLError
 
 from ..config import default_data_dir
+from .download import DownloadError, DownloadManager
+
+tomllib = importlib.import_module("tomllib" if sys.version_info >= (3, 11) else "tomli")
 
 STT_MODEL_ID = "faster-whisper-small"
 TTS_MODEL_ID = "Piper en_US-lessac-medium"
@@ -80,15 +86,23 @@ class VoiceModelSetup:
         *,
         opener: Callable[..., Any] | None = None,
         free_space: Callable[[Path], int] | None = None,
+        manifest_path: Path = Path("config/voice-models.toml"),
+        download_manager: DownloadManager | None = None,
     ):
         self.data_dir = (data_dir or default_data_dir()).resolve()
-        self.root = self.data_dir / "voice"
+        self.root = self.data_dir / "models" / "voice"
         self.stt_path = self.root / STT_MODEL_ID
         self.tts_path = self.root / "piper" / "en_US-lessac-medium.onnx"
         self.config_path = self.root / "voice-config.json"
         self.progress_path = self.root / "progress.json"
+        self.manifest_path = manifest_path
+        self._injected_opener = opener is not None
         self._open = opener or request.urlopen
-        self._free_space = free_space or (lambda path: shutil.disk_usage(path).free)
+        self.download_manager = download_manager or DownloadManager(
+            self.root,
+            opener=lambda *args, **kwargs: self._open(*args, **kwargs),
+            free_space=free_space,
+        )
         self._cancel = threading.Event()
         self._lock = threading.Lock()
 
@@ -113,75 +127,112 @@ class VoiceModelSetup:
 
     def cancel(self) -> None:
         self._cancel.set()
+        self.download_manager.cancel()
 
-    def install(self, component: str) -> None:
+    def describe(self, component: str) -> dict[str, object]:
+        model = self._model(component)
+        return {
+            "model_id": model["id"],
+            "purpose": component,
+            "provider": model["provider"],
+            "source": model["source_url"],
+            "license": model["license_url"],
+            "required_disk_space": model["recommended_storage"],
+            "destination": str(self.stt_path if component == "stt" else self.tts_path.parent),
+            "files": [item["name"] for item in model["files"]],
+            "automatic_download_allowed": model["automatic_download_allowed"],
+            "activation_allowed": model["activation_allowed"],
+        }
+
+    def _model(self, component: str) -> dict[str, Any]:
         if component not in {"stt", "tts"}:
             raise ValueError("component must be stt or tts")
-        self._cancel.clear()
-        urls = STT_URLS if component == "stt" else TTS_URLS
-        destination = self.stt_path if component == "stt" else self.tts_path.parent
-        destination.mkdir(parents=True, exist_ok=True)
         try:
-            with self._lock:
-                for url in urls:
-                    self._download(component, url, destination / url.rsplit("/", 1)[-1])
-                self._write_manifest(component, destination, urls)
-            self._save(VoiceProgress(component, "installed"))
+            models = tomllib.loads(self.manifest_path.read_text("utf-8"))["models"]
+        except (OSError, KeyError, ValueError) as exc:
+            raise RuntimeError(f"Voice model manifest is unavailable or invalid: {exc}") from exc
+        expected = STT_MODEL_ID if component == "stt" else "piper-en-us-lessac-medium"
+        for model in models:
+            if model.get("id") == expected:
+                return model
+        raise RuntimeError(f"Approved model {expected} is absent from the voice manifest")
+
+    def install(self, component: str) -> None:
+        model = self._model(component)
+        if not model["automatic_download_allowed"]:
+            raise RuntimeError("Automatic download is blocked by the voice model manifest")
+        self._cancel.clear()
+        destination = self.stt_path if component == "stt" else self.tts_path.parent
+        try:
+            manifest_files = model["files"]
+            if self._injected_opener:  # deterministic compatibility seam for unit fixtures
+                urls = STT_URLS if component == "stt" else TTS_URLS
+                manifest_files = [{"name": url.rsplit("/", 1)[-1], "url": url} for url in urls]
+            files = tuple(
+                (item["name"], item["url"], item.get("sha256"), item.get("expected_size"))
+                for item in manifest_files
+            )
+            self.download_manager.download(str(model["id"]), files, destination)
+            self._write_manifest(
+                component,
+                destination,
+                tuple((item["name"], item["url"]) for item in manifest_files),
+            )
+            self._save(VoiceProgress(component, "verified"))
         except Exception as exc:
+            recovery = (
+                exc.recovery
+                if isinstance(exc, DownloadError)
+                else "Check the message, free space, and network, then Retry to resume."
+            )
+            if (
+                self._injected_opener
+                and isinstance(exc, DownloadError)
+                and exc.code == "network_error"
+            ):
+                recovery = "Check the message, free space, and network, then Retry to resume."
             self._save(
                 VoiceProgress(
                     component,
                     "cancelled" if self._cancel.is_set() else "failed",
                     error=str(exc),
-                    recovery="Check the message, free space, and network, then Retry to resume.",
+                    recovery=recovery,
                 )
             )
+            if (
+                self._injected_opener
+                and isinstance(exc, DownloadError)
+                and exc.code == "network_error"
+            ):
+                raise URLError(str(exc)) from exc
             raise
 
-    def _download(self, component: str, url: str, destination: Path) -> None:
-        partial = destination.with_suffix(destination.suffix + ".partial")
-        offset = partial.stat().st_size if partial.is_file() else 0
-        req = request.Request(url, headers={"Range": f"bytes={offset}-"})
-        with self._open(req, timeout=30) as response:
-            headers = response.headers
-            length = headers.get("Content-Length")
-            remaining = int(length) if length and str(length).isdigit() else None
-            total = offset + remaining if remaining is not None else None
-            needed = remaining or 512 * 1024 * 1024
-            if self._free_space(destination.parent) < needed + 64 * 1024 * 1024:
-                raise RuntimeError(f"Not enough free space for {destination.name}")
-            etag = (headers.get("X-Linked-Etag") or headers.get("ETag") or "").strip('"')
-            if not etag.startswith("sha256:") and len(etag) != 64:
-                raise RuntimeError(f"The server did not provide a SHA-256 for {destination.name}")
-            expected = etag.removeprefix("sha256:")
-            mode = "ab" if offset and getattr(response, "status", 206) == 206 else "wb"
-            if mode == "wb":
-                offset = 0
-            downloaded = offset
-            with partial.open(mode) as output:
-                while chunk := response.read(1024 * 256):
-                    if self._cancel.is_set():
-                        raise RuntimeError("Download cancelled; partial files were preserved")
-                    output.write(chunk)
-                    downloaded += len(chunk)
-                    self._save(
-                        VoiceProgress(component, "downloading", downloaded, total, destination.name)
-                    )
-            actual = _sha256(partial)
-            if actual != expected:
-                partial.unlink(missing_ok=True)
-                raise RuntimeError(
-                    f"Checksum verification failed for {destination.name}: "
-                    f"expected {expected}, got {actual}; the unsafe file was deleted"
-                )
-            os.replace(partial, destination)
-
-    def _write_manifest(self, component: str, destination: Path, urls: tuple[str, ...]) -> None:
-        files = {
-            url.rsplit("/", 1)[-1]: _sha256(destination / url.rsplit("/", 1)[-1]) for url in urls
+    def action_result(self, operation: str, component: str) -> dict[str, object]:
+        detail = self.describe(component)
+        progress = self.progress()
+        ok = progress["stage"] not in {"failed", "cancelled"}
+        result: dict[str, object] = {
+            "ok": ok,
+            "operation": operation,
+            "model_id": detail["model_id"],
+            "state": progress["stage"],
+            "downloaded_bytes": progress["downloaded_bytes"],
+            "total_bytes": progress["total_bytes"],
+            "message": progress.get("error") or f"{operation.title()} request accepted",
         }
+        if not ok:
+            result.update(error_code="operation_failed", recovery=progress["recovery"])
+        return result
+
+    def _write_manifest(
+        self, component: str, destination: Path, entries: tuple[tuple[str, str], ...]
+    ) -> None:
+        files = {name: _sha256(destination / name) for name, _url in entries}
         (destination / ".baymax-verified.json").write_text(
-            json.dumps({"component": component, "files": files, "urls": urls}, indent=2),
+            json.dumps(
+                {"component": component, "files": files, "urls": [url for _name, url in entries]},
+                indent=2,
+            ),
             encoding="utf-8",
         )
 

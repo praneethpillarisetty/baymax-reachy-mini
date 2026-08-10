@@ -1,6 +1,17 @@
 # Baymax-inspired Reachy Mini wellness companion
 
-A local-first, simulator-first wellness companion—not a medical device or clinician. Shared Python source supports a laptop/simulator target and a separately packaged Linux ARM64/Reachy target. The default path needs no robot, Ollama, model, microphone, speaker, or cloud service.
+**Current status: Phase 7 — real local voice setup and Reachy Mini deployment preparation.**
+
+| Capability | Laptop | Reachy Lite | Reachy Wireless |
+|---|---|---|---|
+| Text/Ollama | Adapter is mock-server tested; live Ollama unverified here | Laptop-hosted profile | Private-LAN hybrid is opt-in; CM4 4B model blocked |
+| STT | faster-whisper-small installer; runtime required | Laptop-hosted | tiny candidate unsupported pending CM4 test |
+| TTS | Lessac files installer; verified Piper runtime required | Laptop-hosted | ARM64 runtime unsupported pending CM4 test |
+| Simulator | Available | Available before hardware | Available/fail-closed before hardware |
+| Robot connection | No hardware needed | Official local/USB SDK validation pending | Official network SDK validation pending |
+| Physical motion | Disabled by default | Supervised hardware test required | Supervised hardware test required |
+
+A local-first, simulator-first wellness companion—not a medical device, clinician, diagnostic tool, or emergency service. What works without hardware: safety, text UI, simulator, mock audio, manifests, resumable download mechanics, and fake-server endpoint tests. Real microphones, speakers, Ollama, SDK connections, CM4 model performance, and all physical movement require the relevant local hardware and explicit validation.
 
 ## Start locally
 
@@ -12,6 +23,19 @@ baymax --once "hello"
 baymax doctor
 python -m pytest
 ```
+
+Windows PowerShell uses `py -m venv .venv; .\.venv\Scripts\Activate.ps1; py -m pip install -e ".[test]"; py -m baymax.cli ui`. Linux/Raspberry Pi uses `python3 -m venv .venv && . .venv/bin/activate && python -m pip install -e '.[test]'`. Laptop setup comes first; do not deploy laptop-only models to a CM4.
+
+## Voice setup order
+
+1. Run `baymax ui`, open **STT**, review its source/license/size/destination confirmation, and choose **Install**.
+2. Watch progress; after a failure use **Retry** (which resumes `.partial`) or **Cancel**. Choose **Verify**, then explicitly **Activate** only after installing `faster-whisper`.
+3. Repeat for **TTS**. Both Lessac files are required. Install Piper separately from its trusted project/package, configure its path, and verify that its architecture matches the host before activation.
+4. Test microphone and speaker. Mock mode visibly means no transcription or spoken audio.
+
+Models are outside Git: `%LOCALAPPDATA%\BaymaxCompanion\models\voice\` on Windows and `~/.local/share/baymax-companion/models/voice/` on Linux. Inspect visible browser JSON and `<data-dir>/models/voice/progress.json`; export diagnostics before troubleshooting. To uninstall, stop Baymax and remove only the relevant directory below `models/voice`; never delete arbitrary paths. A failed checksum removes the unsafe partial; network interruption preserves it for Retry.
+
+Reachy Mini Lite is laptop-hosted and must use a verified official local/USB daemon flow. Reachy Mini Wireless is CM4-hosted and must use a verified official network flow; `reachy-mini.local` is only a discovery candidate, not robot identity proof. Until the SDK wrapper and real hardware pass supervised checks, use the simulator and run `baymax safe-stop`; no discovery/status command may move hardware.
 
 Configuration is read from `--config FILE`, optional `.env`, and then environment variables. Use `config/default.toml`, `config/laptop-ollama.toml`, or the deliberately inference-locked `config/standalone.toml`. Non-loopback Ollama URLs require explicit `BAYMAX_ALLOW_OLLAMA_LAN=true`. See [runtime modes](docs/runtime-modes.md).
 
