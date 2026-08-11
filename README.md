@@ -33,7 +33,7 @@ Windows PowerShell uses `py -m venv .venv; .\.venv\Scripts\Activate.ps1; py -m p
 3. Repeat for **TTS**. Both Lessac files are required. Install Piper separately from its trusted project/package, configure its path, and verify that its architecture matches the host before activation.
 4. Test microphone and speaker. Mock mode visibly means no transcription or spoken audio.
 
-Models are outside Git: `%LOCALAPPDATA%\BaymaxCompanion\models\voice\` on Windows and `~/.local/share/baymax-companion/models/voice/` on Linux. Inspect visible browser JSON and `<data-dir>/models/voice/progress.json`; export diagnostics before troubleshooting. To uninstall, stop Baymax and remove only the relevant directory below `models/voice`; never delete arbitrary paths. A failed checksum removes the unsafe partial; network interruption preserves it for Retry.
+Models are outside Git: `%LOCALAPPDATA%\BaymaxCompanion\models\voice\` on Windows and `~/.local/share/baymax-companion/models/voice/` on Linux. DownloadManager's hashed JSON records under `models/voice/.state/` are the single progress authority; inspect them through `baymax voice-model progress` or `/api/voice/debug` rather than editing them. States are `idle`, `downloading`, `paused`, `verifying`, `verified`, `failed`, and `cancelled`. To uninstall, stop Baymax and remove only the relevant directory below `models/voice`; never delete arbitrary paths. A failed checksum removes the unsafe partial; network interruption or cancellation preserves a safe `.partial` for Retry.
 
 The Windows executable bundles the approved voice manifest. Python 3.11+ uses the standard-library `tomllib`; Python 3.10 uses the declared `tomli` compatibility dependency, allowing PyInstaller to discover either import statically.
 

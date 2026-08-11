@@ -16,3 +16,10 @@ For unexpected motion or daemon/audio loss, stop immediately using the official 
 ## Voice download buttons
 
 The Install action requires JSON `Content-Type`, the manifest `model_id`, and `confirm: true`. Poll `/api/voice/progress`; failures include an error code, message, and recovery. Retry preserves valid partial data, while checksum failure deletes unsafe data. Confirm the destination is under the platform application-data `models/voice` directory and export voice diagnostics. Mock ASR and console TTS intentionally provide no real transcription or speech.
+
+For a stuck or failed voice install, inspect `GET /api/voice/debug`. It reports the
+selected component, approved URLs, redacted destination/state paths, current
+authoritative progress, worker liveness, final/partial file existence, and the last
+error/recovery message. HTTP 403/404, timeout/TLS failures, HTML responses, short
+responses, and checksum errors are visible as `failed`. Correct the stated cause and
+choose Retry; do not start a second worker or manually rename a partial file.

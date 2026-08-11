@@ -7,3 +7,8 @@ Implemented and fake-server tested: allow-listed manifest parsing, HTTPS downloa
 Not verified here: live Hugging Face downloads, real Ollama, host microphone/speaker, Piper binaries, official SDK connection modes, Lite USB/daemon detection, Wireless network/daemon identity, ARM64 Piper, CM4 STT performance, and physical movement. Those stay fail-closed.
 
 The Phase 7 Windows packaging repair uses statically discoverable `tomllib`/`tomli` imports and bundles `config/voice-models.toml`; native Windows executable execution remains a Windows-runner check.
+
+Voice model setup now uses DownloadManager's `.state` records as its sole source of
+truth, including live cumulative byte progress, verification, cancellation, and
+persisted worker failures. Browser polling and the `voice-model` CLI consume that
+same state. Physical audio activation and large live downloads remain manual checks.

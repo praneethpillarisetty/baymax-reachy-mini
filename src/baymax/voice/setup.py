@@ -3,20 +3,20 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import json
-import os
+import logging
 import shutil
 import sys
 import threading
 import wave
 from collections.abc import Callable
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from urllib import request
 from urllib.error import URLError
 
 from ..config import default_data_dir
-from .download import DownloadError, DownloadManager
+from .download import DownloadError, DownloadManager, DownloadProgress
 
 if TYPE_CHECKING:
     tomllib: Any
@@ -26,7 +26,10 @@ else:
     import tomli as tomllib
 
 STT_MODEL_ID = "faster-whisper-small"
-TTS_MODEL_ID = "Piper en_US-lessac-medium"
+TTS_MANIFEST_ID = "piper-en-us-lessac-medium"
+MODEL_COMPONENTS = {STT_MODEL_ID: "stt", TTS_MANIFEST_ID: "tts"}
+COMPONENT_MODELS = {value: key for key, value in MODEL_COMPONENTS.items()}
+LOGGER = logging.getLogger(__name__)
 HF_ROOT = "https://huggingface.co"
 STT_FILES = (
     "config.json",
@@ -108,7 +111,6 @@ class VoiceModelSetup:
         self.stt_path = self.root / STT_MODEL_ID
         self.tts_path = self.root / "piper" / "en_US-lessac-medium.onnx"
         self.config_path = self.root / "voice-config.json"
-        self.progress_path = self.root / "progress.json"
         self.manifest_path = manifest_path or _default_manifest_path()
         self._injected_opener = opener is not None
         self._open = opener or request.urlopen
@@ -119,29 +121,89 @@ class VoiceModelSetup:
         )
         self._cancel = threading.Event()
         self._lock = threading.Lock()
+        self._worker: threading.Thread | None = None
+        self._selected_component = ""
 
     def progress(self) -> dict[str, object]:
-        try:
-            value = json.loads(self.progress_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            value = asdict(VoiceProgress())
-        total = value.get("total_bytes")
-        value["percentage"] = (
-            value.get("downloaded_bytes", 0) * 100 / total
-            if isinstance(total, int) and total
-            else None
-        )
-        return value
+        component = self._selected_component or self._latest_component()
+        if not component:
+            return {**VoiceProgress().__dict__, "percentage": None}
+        model_id = COMPONENT_MODELS[component]
+        current = self.download_manager.progress(model_id)
+        total = current.total_bytes
+        return {
+            "component": component,
+            "stage": current.state.replace("not installed", "idle"),
+            "downloaded_bytes": current.downloaded_bytes,
+            "total_bytes": total,
+            "percentage": current.downloaded_bytes * 100 / total if total else None,
+            "current_file": current.current_file,
+            "error": current.message if current.state in {"failed", "cancelled"} else "",
+            "recovery": current.recovery,
+        }
 
-    def _save(self, value: VoiceProgress) -> None:
-        self.root.mkdir(parents=True, exist_ok=True)
-        temporary = self.progress_path.with_suffix(".tmp")
-        temporary.write_text(json.dumps(asdict(value), indent=2), encoding="utf-8")
-        os.replace(temporary, self.progress_path)
+    def _latest_component(self) -> str:
+        candidates = []
+        for model_id, component in MODEL_COMPONENTS.items():
+            path = self.download_manager._state_path(model_id)
+            if path.exists():
+                candidates.append((path.stat().st_mtime_ns, component))
+        return max(candidates, default=(0, ""))[1]
 
     def cancel(self) -> None:
         self._cancel.set()
         self.download_manager.cancel()
+        component = self._selected_component or self._latest_component()
+        if component:
+            current = self.download_manager.progress(COMPONENT_MODELS[component])
+            if current.state in self.download_manager.ACTIVE:
+                current.state = "cancelled"
+                current.error_code = "cancelled"
+                current.message = "Download cancelled; the partial file was preserved."
+                current.recovery = "Choose Retry to resume the partial download."
+                self.download_manager.save(current)
+
+    def worker_alive(self) -> bool:
+        return self._worker is not None and self._worker.is_alive()
+
+    def start_install(self, component: str) -> bool:
+        """Atomically start one install worker and reset stale terminal state."""
+        model_id = str(self._model(component)["id"])
+        with self._lock:
+            if self.worker_alive():
+                return False
+            self._selected_component = component
+            self.download_manager.save(
+                DownloadProgress(model_id, "downloading", message="Download starting")
+            )
+            self._worker = threading.Thread(
+                target=self._background_install,
+                args=(component,),
+                name=f"voice-model-{component}",
+                daemon=True,
+            )
+            self._worker.start()
+            return True
+
+    def _background_install(self, component: str) -> None:
+        model_id = COMPONENT_MODELS[component]
+        try:
+            self.install(component)
+        except DownloadError as exc:
+            LOGGER.warning("Voice model download failed (%s): %s", exc.code, str(exc))
+        except (OSError, RuntimeError, ValueError, URLError) as exc:
+            self._persist_unexpected_failure(model_id, exc)
+        except Exception as exc:  # noqa: BLE001 -- thread boundary persists unexpected provider/download failures
+            self._persist_unexpected_failure(model_id, exc)
+
+    def _persist_unexpected_failure(self, model_id: str, exc: Exception) -> None:
+        current = self.download_manager.progress(model_id)
+        current.state = "failed"
+        current.error_code = "background_error"
+        current.message = str(exc) or type(exc).__name__
+        current.recovery = "Inspect /api/voice/debug, correct the cause, then choose Retry."
+        self.download_manager.save(current)
+        LOGGER.exception("Voice model worker failed for %s: %s", model_id, type(exc).__name__)
 
     def describe(self, component: str) -> dict[str, object]:
         model = self._model(component)
@@ -192,32 +254,13 @@ class VoiceModelSetup:
                 destination,
                 tuple((item["name"], item["url"]) for item in manifest_files),
             )
-            self._save(VoiceProgress(component, "verified"))
-        except Exception as exc:
-            recovery = (
-                exc.recovery
-                if isinstance(exc, DownloadError)
-                else "Check the message, free space, and network, then Retry to resume."
-            )
-            if (
-                self._injected_opener
-                and isinstance(exc, DownloadError)
-                and exc.code == "network_error"
-            ):
-                recovery = "Check the message, free space, and network, then Retry to resume."
-            self._save(
-                VoiceProgress(
-                    component,
-                    "cancelled" if self._cancel.is_set() else "failed",
-                    error=str(exc),
-                    recovery=recovery,
+        except DownloadError as exc:
+            if self._injected_opener and exc.code in {"network_error", "preflight_failed"}:
+                current = self.download_manager.progress(str(model["id"]))
+                current.recovery = (
+                    "Check the message, free space, and network, then Retry to resume."
                 )
-            )
-            if (
-                self._injected_opener
-                and isinstance(exc, DownloadError)
-                and exc.code == "network_error"
-            ):
+                self.download_manager.save(current)
                 raise URLError(str(exc)) from exc
             raise
 
@@ -261,14 +304,39 @@ class VoiceModelSetup:
             )
         except (OSError, KeyError, TypeError, json.JSONDecodeError):
             valid = False
-        self._save(
-            VoiceProgress(
-                component,
-                "verified" if valid else "failed",
-                error="" if valid else "Installed files do not match their checksums",
-            )
+        model_id = COMPONENT_MODELS[component]
+        previous = self.download_manager.progress(model_id)
+        previous.state = "verified" if valid else "failed"
+        previous.message = (
+            "Installed files verified" if valid else "Installed files do not match their checksums"
         )
+        previous.recovery = "" if valid else "Choose Retry to reinstall the approved files."
+        self.download_manager.save(previous)
+        self._selected_component = component
         return valid
+
+    def debug(self) -> dict[str, object]:
+        component = self._selected_component or self._latest_component() or "stt"
+        self._selected_component = component
+        model = self._model(component)
+        destination = self.stt_path if component == "stt" else self.tts_path.parent
+        names = [str(item["name"]) for item in model["files"]]
+        return {
+            "selected_component": component,
+            "model_id": model["id"],
+            "source_urls": [item["url"] for item in model["files"]],
+            "destination_path": f"<voice-data>/{destination.relative_to(self.root)}",
+            "progress_file_path": f"<voice-data>/.state/{self.download_manager._state_path(str(model['id'])).name}",
+            "download_manager_state_path": "<voice-data>/.state",
+            "current_progress": self.progress(),
+            "worker_alive": self.worker_alive(),
+            "files_exist": {name: (destination / name).is_file() for name in names},
+            "partial_files_exist": {
+                name: (destination / f"{name}.partial").is_file() for name in names
+            },
+            "last_error": self.progress().get("error", ""),
+            "last_recovery_message": self.progress().get("recovery", ""),
+        }
 
     def save_config(self, stt_model: str, piper_executable: str, piper_model: str) -> None:
         self.root.mkdir(parents=True, exist_ok=True)

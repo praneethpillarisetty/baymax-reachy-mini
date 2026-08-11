@@ -142,14 +142,29 @@ class DownloadManager:
                     "Use the application data directory.",
                 )
             destination.mkdir(parents=True, exist_ok=True)
+            completed = 0
+            known_total = sum(size for _name, _url, _checksum, size in files if size is not None)
+            all_sizes_known = all(size is not None for _n, _u, _c, size in files)
             for name, url, checksum, expected_size in files:
                 self._download_file(
-                    model_id, safe_filename(name), url, checksum, expected_size, destination
+                    model_id,
+                    safe_filename(name),
+                    url,
+                    checksum,
+                    expected_size,
+                    destination,
+                    completed,
+                    known_total if all_sizes_known else None,
                 )
+                completed += (destination / safe_filename(name)).stat().st_size
+            previous = self.progress(model_id)
             self.save(
                 DownloadProgress(
                     model_id,
                     "verified",
+                    completed,
+                    completed,
+                    previous.current_file,
                     message="All files downloaded, atomically installed, and verified.",
                 )
             )
@@ -171,6 +186,8 @@ class DownloadManager:
         checksum: str | None,
         expected_size: int | None,
         destination: Path,
+        completed: int = 0,
+        aggregate_total: int | None = None,
     ) -> None:
         parsed = urlparse(url)
         if parsed.scheme != "https" and not (self.allow_http_for_tests and parsed.scheme == "http"):
@@ -181,6 +198,7 @@ class DownloadManager:
             )
         final, partial = destination / name, destination / f"{name}.partial"
         offset = partial.stat().st_size if partial.exists() else 0
+        self._preflight(url, name, expected_size)
         last_error: Exception | None = None
         for attempt in range(self.retries + 1):
             try:
@@ -202,6 +220,13 @@ class DownloadManager:
                     if offset and status == 200:
                         offset = 0
                     length = response.headers.get("Content-Length")
+                    content_type = response.headers.get("Content-Type", "").lower()
+                    if "text/html" in content_type:
+                        raise DownloadError(
+                            "invalid_content",
+                            f"The source returned HTML instead of model data for {name}.",
+                            "Check the approved source URL and retry when the provider is available.",
+                        )
                     response_checksum = (
                         (
                             response.headers.get("X-Linked-Etag")
@@ -216,6 +241,12 @@ class DownloadManager:
                     )
                     remaining = int(length) if length and length.isdigit() else None
                     total = (offset + remaining) if remaining is not None else expected_size
+                    if expected_size is not None and total is not None and total < expected_size:
+                        raise DownloadError(
+                            "invalid_content",
+                            f"The source response for {name} is smaller than expected.",
+                            "Check the provider response and approved manifest, then retry.",
+                        )
                     if total is not None and total > self.max_file_bytes:
                         raise DownloadError(
                             "size_limit",
@@ -230,7 +261,15 @@ class DownloadManager:
                             "Free disk space, then Retry to resume.",
                         )
                     self._stream(
-                        model_id, name, response, partial, "ab" if append else "wb", offset, total
+                        model_id,
+                        name,
+                        response,
+                        partial,
+                        "ab" if append else "wb",
+                        offset,
+                        total,
+                        completed,
+                        aggregate_total,
                     )
                 if expected_size is not None and partial.stat().st_size != expected_size:
                     raise DownloadError(
@@ -242,8 +281,8 @@ class DownloadManager:
                     DownloadProgress(
                         model_id,
                         "verifying",
-                        partial.stat().st_size,
-                        partial.stat().st_size,
+                        completed + partial.stat().st_size,
+                        aggregate_total or completed + partial.stat().st_size,
                         name,
                         message=f"Verifying {name}",
                     )
@@ -271,6 +310,43 @@ class DownloadManager:
             "Check the network and source, then Retry to resume.",
         )
 
+    def _preflight(self, url: str, name: str, expected_size: int | None) -> None:
+        """Validate an approved URL cheaply; providers without HEAD support fall back to GET."""
+        headers = {"User-Agent": "BaymaxCompanion/voice-setup"}
+        try:
+            response = self.opener(
+                request.Request(url, headers=headers, method="HEAD"), timeout=self.timeout
+            )
+            with response:
+                content_type = response.headers.get("Content-Type", "").lower()
+                length = response.headers.get("Content-Length")
+                if "text/html" in content_type:
+                    raise DownloadError(
+                        "invalid_content",
+                        f"The source returned HTML instead of model data for {name}.",
+                        "Check the approved manifest URL and provider status, then retry.",
+                    )
+                if expected_size is not None and length and int(length) < expected_size:
+                    raise DownloadError(
+                        "invalid_content",
+                        f"The source response for {name} is smaller than expected.",
+                        "Check the approved manifest URL and provider status, then retry.",
+                    )
+        except HTTPError as exc:
+            if exc.code in {405, 501}:
+                return
+            raise DownloadError(
+                f"http_{exc.code}",
+                f"Model source preflight returned HTTP {exc.code} for {name}.",
+                "Confirm provider access and retry; only manifest URLs may be used.",
+            ) from exc
+        except (URLError, TimeoutError, OSError) as exc:
+            raise DownloadError(
+                "preflight_failed",
+                f"Model source preflight failed for {name}: {exc}",
+                "Check TLS, network access, and provider availability, then retry.",
+            ) from exc
+
     def _stream(
         self,
         model_id: str,
@@ -280,6 +356,8 @@ class DownloadManager:
         mode: str,
         offset: int,
         total: int | None,
+        completed: int = 0,
+        aggregate_total: int | None = None,
     ) -> None:
         downloaded = offset
         with partial.open(mode) as output:
@@ -293,7 +371,12 @@ class DownloadManager:
                 while self._pause.is_set():
                     self.save(
                         DownloadProgress(
-                            model_id, "paused", downloaded, total, name, message="Download paused"
+                            model_id,
+                            "paused",
+                            completed + downloaded,
+                            aggregate_total or (completed + total if total is not None else None),
+                            name,
+                            message="Download paused",
                         )
                     )
                     if self._cancel.wait(0.1):
@@ -311,8 +394,8 @@ class DownloadManager:
                     DownloadProgress(
                         model_id,
                         "downloading",
-                        downloaded,
-                        total,
+                        completed + downloaded,
+                        aggregate_total or (completed + total if total is not None else None),
                         name,
                         message=f"Downloading {name}",
                     )
