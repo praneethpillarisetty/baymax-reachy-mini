@@ -3,7 +3,6 @@ from __future__ import annotations
 import html
 import json
 import tempfile
-import threading
 import time
 import webbrowser
 from dataclasses import dataclass
@@ -20,13 +19,6 @@ from .voice.setup import VoiceModelSetup, provider_status
 MAX_REQUEST_BYTES = 16 * 1024 * 1024
 MAX_AUDIO_SECONDS = 30
 UI_HOST = "127.0.0.1"
-
-
-def _background_install(setup: VoiceModelSetup, component: str) -> None:
-    try:
-        setup.install(component)
-    except Exception:  # noqa: BLE001 -- failure details are persisted for progress polling
-        return
 
 
 @dataclass(frozen=True)
@@ -54,8 +46,8 @@ def render_page(context: UIContext, response: str = "") -> bytes:
 <div class="grid"><section class="card"><h2>Text Chat</h2><div id="history">{reply}</div><textarea id="message" maxlength="4000" placeholder="How can I support you?"></textarea><button id="send">Send</button><button id="test">Test Ollama</button><button id="retry" hidden>Retry</button><div id="error" class="error" hidden></div></section>
 <section class="card"><h2>Voice Chat</h2><b id="voiceState">Ready</b><p id="timer">00:00</p><button id="record">Start recording</button><button id="stopRecord" disabled>Stop recording</button><button id="sendTranscript" disabled>Send transcript</button><p id="transcript">Transcript preview</p><label><input id="auto" type="checkbox"> Automatic playback</label><br><button id="play" disabled>Play response</button><button id="stopPlay">Stop playback</button><a id="download" hidden download="baymax-response.wav">Download generated WAV</a><div id="micError" class="error" hidden></div></section>
 <section class="card"><h2>Diagnostics</h2><button id="refresh">Refresh status</button><button id="copy">Copy diagnostics</button><button id="export">Export diagnostics</button><pre id="diagnostics">Not loaded</pre></section>
-<section class="card"><h2>STT — faster-whisper</h2><p><b>Model:</b> faster-whisper-small<br><b>Source/license/storage/status:</b> use Refresh status. CPU uses int8; CUDA is never selected implicitly.</p><progress id="sttProgress" max="100" value="0"></progress><br><button data-action="install/stt">Install</button><button data-action="verify/stt">Verify</button><button data-action="activate/stt">Activate</button><button id="testMic">Test microphone</button></section>
-<section class="card"><h2>TTS — Piper</h2><p><b>Voice:</b> en_US-lessac-medium<br><b>Required:</b> .onnx and .onnx.json plus an architecture-matched Piper runtime.</p><progress id="ttsProgress" max="100" value="0"></progress><br><button data-action="install/tts">Install</button><button data-action="verify/tts">Verify</button><button data-action="activate/tts">Activate</button><button id="testSpeaker">Test speaker</button></section>
+<section class="card"><h2>STT — faster-whisper</h2><p><b>Model:</b> faster-whisper-small<br><b>Source/license/storage/status:</b> use Refresh status. CPU uses int8; CUDA is never selected implicitly.</p><progress id="sttProgress" max="100" value="0"></progress><div id="sttDetail">Idle</div><br><button id="install-stt" data-action="install/stt">Install</button><button id="verify-stt" data-action="verify/stt" hidden>Verify</button><button data-action="activate/stt">Activate</button><button id="testMic">Test microphone</button></section>
+<section class="card"><h2>TTS — Piper</h2><p><b>Voice:</b> en_US-lessac-medium<br><b>Required:</b> .onnx and .onnx.json plus an architecture-matched Piper runtime.</p><progress id="ttsProgress" max="100" value="0"></progress><div id="ttsDetail">Idle</div><br><button id="install-tts" data-action="install/tts">Install</button><button id="verify-tts" data-action="verify/tts" hidden>Verify</button><button data-action="activate/tts">Activate</button><button id="testSpeaker">Test speaker</button></section>
 <section class="card"><h2>Voice setup controls</h2><button id="refreshVoice">Refresh status</button><button data-action="loop">Test complete voice loop</button><button data-action="cancel">Cancel</button><button data-action="retry">Retry</button><button id="exportVoice">Export diagnostics</button><button id="copyVoice">Copy diagnostics</button><pre id="voiceProgress">Idle</pre><label>STT model path <input id="sttPath"></label><br><label>Piper executable path <input id="piperExe"></label><br><label>Piper model path <input id="piperModel"></label><br><button id="saveVoice">Save reviewable paths</button><div id="setupError" class="error" hidden></div></section>
 <section class="card"><h2>Private local setup</h2><p>Audio is limited to 30 seconds/16 MiB, processed locally, and deleted after transcription. Chrome/Edge WebM/Opus is supported when the configured STT runtime has FFmpeg codecs.</p><code>BAYMAX_MODE=laptop<br>BAYMAX_LLM_BACKEND=ollama<br>OLLAMA_URL=http://127.0.0.1:11434<br>OLLAMA_MODEL=qwen3:4b</code></section></div>
 <section hidden><h2>Setup dashboard</h2><h3>Installation progress</h3></section>
@@ -69,7 +61,7 @@ $('record').onclick=async()=>{{try{{if(!window.MediaRecorder)throw Error('This b
 $('stopRecord').onclick=()=>{{clearInterval(tick);recorder.onstop=async()=>{{recorder.stream.getTracks().forEach(t=>t.stop());let blob=new Blob(chunks,{{type:recorder.mimeType}});if(blob.size>16777216){{fail('Recording exceeds 16 MiB');return}}state('Transcribing');try{{let r=await fetch('/api/transcribe',{{method:'POST',headers:{{'Content-Type':blob.type}},body:blob}});let j=await r.json();if(!r.ok)throw Error(j.error);transcript=j.transcript;$('transcript').textContent=transcript;$('sendTranscript').disabled=false;state('Ready')}}catch(e){{fail(e.message)}}}};recorder.stop();$('record').disabled=false;$('stopRecord').disabled=true}};$('sendTranscript').onclick=()=>send(transcript);
 async function speech(text){{state('Generating speech');let r=await fetch('/api/speech',{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify({{text}})}});if(!r.ok){{let j=await r.json();throw Error(j.error)}}let b=await r.blob();if(audioUrl)URL.revokeObjectURL(audioUrl);audioUrl=URL.createObjectURL(b);$('download').href=audioUrl;$('download').hidden=false;window.player=new Audio(audioUrl);window.player.onplay=()=>state('Playing');window.player.onended=()=>state('Complete');await window.player.play()}};$('play').onclick=()=>speech(document.querySelector('#history .message:last-child')?.innerText||'');$('stopPlay').onclick=()=>window.player?.pause();$('refresh').click();
 async function setupAction(action,payload={{}}){{$('setupError').hidden=true;try{{if(action.startsWith('install/')){{let component=action.split('/')[1],d=await (await fetch('/api/voice/status/'+component)).json();if(!confirm(`Download ${{d.model_id}}?\nSource: ${{d.source}}\nLicense: ${{d.license}}\nSize: ${{d.required_disk_space}}\nDestination: ${{d.destination}}`))return;payload={{confirm:true,model_id:d.model_id}}}}if(action.startsWith('activate/')&&!confirm('Activate this verified provider after restart?'))return;if(action.startsWith('activate/'))payload={{confirm:true}};let r=await fetch('/api/voice/'+action,{{method:'POST',headers:{{'Content-Type':'application/json'}},body:JSON.stringify(payload)}}),j=await r.json();$('voiceProgress').textContent=JSON.stringify(j,null,2);if(!r.ok||!j.ok)throw Error(j.message||j.error||`HTTP ${{r.status}}`);await $('refresh').onclick()}}catch(e){{$('setupError').hidden=false;$('setupError').textContent=e.message}}}}document.querySelectorAll('[data-action]').forEach(b=>b.onclick=()=>setupAction(b.dataset.action));
-$('saveVoice').onclick=()=>setupAction('config',{{stt_model_path:$('sttPath').value,piper_executable_path:$('piperExe').value,piper_model_path:$('piperModel').value}});fetch('/api/voice/config').then(r=>r.json()).then(j=>{{$('sttPath').value=j.asr_model_path;$('piperExe').value=j.tts_executable;$('piperModel').value=j.tts_model_path}});async function pollVoice(){{let r=await fetch('/api/voice/progress'),j=await r.json();$('voiceProgress').textContent=JSON.stringify(j,null,2);let p=j.percentage||0;if(j.component==='stt')$('sttProgress').value=p;if(j.component==='tts')$('ttsProgress').value=p}}setInterval(pollVoice,1000);$('refreshVoice').onclick=pollVoice;$('copyVoice').onclick=()=>navigator.clipboard.writeText($('voiceProgress').textContent);$('exportVoice').onclick=()=>{{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('voiceProgress').textContent],{{type:'application/json'}}));a.download='baymax-voice-diagnostics.json';a.click()}};
+$('saveVoice').onclick=()=>setupAction('config',{{stt_model_path:$('sttPath').value,piper_executable_path:$('piperExe').value,piper_model_path:$('piperModel').value}});fetch('/api/voice/config').then(r=>r.json()).then(j=>{{$('sttPath').value=j.asr_model_path;$('piperExe').value=j.tts_executable;$('piperModel').value=j.tts_model_path}});async function pollVoice(){{let r=await fetch('/api/voice/progress'),j=await r.json();$('voiceProgress').textContent=JSON.stringify(j,null,2);if(!['stt','tts'].includes(j.component))return;let p=j.percentage||0,bytes=`${{j.downloaded_bytes||0}} / ${{j.total_bytes||'?'}} bytes`,detail=[j.current_file,`${{p.toFixed(1)}}%`,bytes,j.error,j.recovery].filter(Boolean).join(' — ');$(j.component+'Progress').value=p;$(j.component+'Detail').textContent=detail;let active=['downloading','verifying','paused'].includes(j.stage);$('install-'+j.component).disabled=active;$('verify-'+j.component).hidden=!['verified','installed'].includes(j.stage);document.querySelector('[data-action="retry"]').disabled=j.stage!=='failed'&&j.stage!=='cancelled'}}setInterval(pollVoice,1000);pollVoice();$('refreshVoice').onclick=pollVoice;$('copyVoice').onclick=()=>navigator.clipboard.writeText($('voiceProgress').textContent);$('exportVoice').onclick=()=>{{let a=document.createElement('a');a.href=URL.createObjectURL(new Blob([$('voiceProgress').textContent],{{type:'application/json'}}));a.download='baymax-voice-diagnostics.json';a.click()}};
 $('testMic').onclick=async()=>{{try{{let s=await navigator.mediaDevices.getUserMedia({{audio:true}}),d=await navigator.mediaDevices.enumerateDevices();s.getTracks().forEach(t=>t.stop());$('voiceProgress').textContent=`Microphone permission granted; ${{d.filter(x=>x.kind==='audioinput').length}} input(s)`}}catch(e){{$('setupError').hidden=false;$('setupError').textContent='Microphone test failed: '+e.message}}}};$('testSpeaker').onclick=()=>{{let c=new AudioContext(),o=c.createOscillator();o.connect(c.destination);o.start();o.stop(c.currentTime+.25);$('voiceProgress').textContent='Speaker test tone played'}};$('refresh').click();
 </script></body></html>""".encode()
 
@@ -176,6 +168,8 @@ def create_handler(
                 self._json(context.model_manager.setup_status())
             elif path == "/api/voice/progress":
                 self._json(context.voice_setup.progress())
+            elif path == "/api/voice/debug":
+                self._json(context.voice_setup.debug())
             elif path == "/api/voice/config":
                 self._json(context.voice_setup.config())
             elif path.startswith("/api/voice/status/"):
@@ -236,20 +230,24 @@ def create_handler(
                             raise ValueError(
                                 "The model_id does not match the approved manifest model"
                             )
-                        threading.Thread(
-                            target=_background_install,
-                            args=(context.voice_setup, component),
-                            daemon=True,
-                        ).start()
+                        started = context.voice_setup.start_install(component)
+                        if not started:
+                            self._json(
+                                {
+                                    "ok": False,
+                                    "message": "A voice-model worker is already running.",
+                                },
+                                HTTPStatus.CONFLICT,
+                            )
+                            return
                         self._json(
                             {
                                 "ok": True,
                                 "operation": "download",
                                 "model_id": description["model_id"],
-                                "state": "downloading",
-                                "downloaded_bytes": 0,
-                                "total_bytes": None,
-                                "message": "Download worker started; poll /api/voice/progress.",
+                                "state": "started",
+                                "worker_started": True,
+                                "message": "Download started; poll progress.",
                             },
                             HTTPStatus.ACCEPTED,
                         )
@@ -290,12 +288,14 @@ def create_handler(
                         component = str(progress.get("component", ""))
                         if component not in {"stt", "tts"}:
                             raise ValueError("Nothing to retry")
-                        threading.Thread(
-                            target=_background_install,
-                            args=(context.voice_setup, component),
-                            daemon=True,
-                        ).start()
-                        self._json({"ok": True, "result": "Retry started"})
+                        started = context.voice_setup.start_install(component)
+                        self._json(
+                            {
+                                "ok": started,
+                                "result": "Retry started" if started else "Worker already running",
+                            },
+                            HTTPStatus.ACCEPTED if started else HTTPStatus.CONFLICT,
+                        )
                     elif action == "loop":
                         if (
                             context.asr.provider_name() == "mock"

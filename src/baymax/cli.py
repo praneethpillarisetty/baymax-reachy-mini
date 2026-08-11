@@ -152,6 +152,16 @@ def parser() -> argparse.ArgumentParser:
     voice_test.add_argument(
         "component", choices=("microphone", "speaker", "asr", "tts", "end-to-end")
     )
+    voice_model = commands.add_parser("voice-model").add_subparsers(
+        dest="voice_model_command", required=True
+    )
+    voice_model.add_parser("status")
+    voice_model.add_parser("progress")
+    voice_install = voice_model.add_parser("install")
+    voice_install.add_argument("component", choices=("stt", "tts"))
+    voice_install.add_argument("--confirm", action="store_true")
+    voice_verify = voice_model.add_parser("verify")
+    voice_verify.add_argument("component", choices=("stt", "tts"))
     setup = commands.add_parser("setup").add_subparsers(dest="setup_command", required=True)
     setup_plan = setup.add_parser("plan")
     setup_plan.add_argument(
@@ -184,6 +194,27 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
     store = LocalStore(settings.database_path)
+    if args.command == "voice-model":
+        setup = VoiceModelSetup(settings.data_dir)
+        if args.voice_model_command in {"status", "progress"}:
+            value = setup.debug() if args.voice_model_command == "status" else setup.progress()
+            print(json.dumps(value, indent=2))
+            return 0
+        if args.voice_model_command == "install":
+            if not args.confirm:
+                print("Installation requires --confirm.", file=sys.stderr)
+                return 2
+            try:
+                setup.install(args.component)
+            except (OSError, RuntimeError, ValueError) as exc:
+                print(json.dumps(setup.progress(), indent=2), file=sys.stderr)
+                print(f"Install failed: {exc}", file=sys.stderr)
+                return 1
+            print(json.dumps(setup.progress(), indent=2))
+            return 0
+        verified = setup.verify(args.component)
+        print(json.dumps(setup.progress(), indent=2))
+        return 0 if verified else 1
     if args.command == "setup":
         setup = VoiceModelSetup(settings.data_dir)
         report = {

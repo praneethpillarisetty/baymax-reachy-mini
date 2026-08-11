@@ -189,7 +189,8 @@ sha256 = "{hashlib.sha256(payload).hexdigest()}"
             "/api/voice/install/stt",
             {"model_id": detail["model_id"], "confirm": True},
         )
-        assert result["operation"] == "download" and result["state"] == "downloading"
+        assert result["operation"] == "download" and result["state"] == "started"
+        assert result["worker_started"] is True
         for _ in range(50):
             if _request(url, "/api/voice/progress")["stage"] == "verified":
                 break

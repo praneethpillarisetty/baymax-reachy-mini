@@ -46,3 +46,12 @@ deleted immediately after use. Audio is never uploaded to a third party.
 
 Physical Reachy movement remains unavailable: the application continues to
 reject the Reachy backend until its supervised adapter validation is complete.
+Progress is authoritative in `<data-dir>/models/voice/.state/<sha256(model-id)>.json`.
+The UI and `baymax voice-model progress` translate the manifest IDs
+`faster-whisper-small` to `stt` and `piper-en-us-lessac-medium` to `tts`. The exact
+state sequence is `idle` → `downloading` → `verifying` → `verified`; `paused`,
+`cancelled`, and `failed` are terminal/interruption states. Downloads expose the
+current file, cumulative bytes, total bytes when known, percentage, error, and a
+specific recovery instruction. Retry resumes a safe `.partial`; checksum failures
+delete it. Use `baymax voice-model install stt --confirm` (or `tts`), `status`,
+`progress`, and `verify stt|tts` for the same records shown in the browser.
