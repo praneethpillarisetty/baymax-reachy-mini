@@ -193,8 +193,7 @@ class VoiceModelSetup:
             LOGGER.warning("Voice model download failed (%s): %s", exc.code, str(exc))
         except (OSError, RuntimeError, ValueError, URLError) as exc:
             self._persist_unexpected_failure(model_id, exc)
-        except Exception as exc:
-            # Thread boundary: persist an otherwise unexpected provider failure so the UI survives.
+        except Exception as exc:  # noqa: BLE001 -- thread boundary persists unexpected provider/download failures
             self._persist_unexpected_failure(model_id, exc)
 
     def _persist_unexpected_failure(self, model_id: str, exc: Exception) -> None:

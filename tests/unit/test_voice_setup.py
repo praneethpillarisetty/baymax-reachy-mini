@@ -100,6 +100,30 @@ def test_free_space_and_network_failures_are_clear(tmp_path: Path, monkeypatch):
     assert setup.progress()["recovery"].startswith("Check the message")
 
 
+def test_unexpected_background_failure_is_persisted_and_visible(tmp_path: Path, monkeypatch):
+    setup = VoiceModelSetup(tmp_path)
+
+    def fail_unexpectedly(_component: str) -> None:
+        raise LookupError("provider returned an unexpected payload")
+
+    monkeypatch.setattr(setup, "install", fail_unexpectedly)
+    assert setup.start_install("stt") is True
+    assert setup._worker is not None
+    setup._worker.join(timeout=2)
+
+    progress = setup.progress()
+    debug = setup.debug()
+    assert progress["stage"] == "failed"
+    assert progress["error"] == "provider returned an unexpected payload"
+    assert progress["recovery"] == (
+        "Inspect /api/voice/debug, correct the cause, then choose Retry."
+    )
+    assert debug["current_progress"] == progress
+    assert debug["last_error"] == progress["error"]
+    assert debug["last_recovery_message"] == progress["recovery"]
+    assert debug["worker_alive"] is False
+
+
 def test_mock_providers_are_not_real_voice_available(tmp_path: Path, monkeypatch):
     monkeypatch.setattr("baymax.voice.setup.device_status", lambda _kind: (True, "test device"))
     setup = VoiceModelSetup(tmp_path)
