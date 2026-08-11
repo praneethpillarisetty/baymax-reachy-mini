@@ -1,5 +1,5 @@
-import json
 import hashlib
+import json
 import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -16,9 +16,9 @@ from baymax.robot.simulator import SimulatorRobot
 from baymax.safety import SafetyEngine
 from baymax.tools import ToolExecutor
 from baymax.ui import create_handler
-from baymax.voice.tts import ConsoleTTS
 from baymax.voice.download import DownloadManager
 from baymax.voice.setup import VoiceModelSetup
+from baymax.voice.tts import ConsoleTTS
 
 
 class FakeApp:

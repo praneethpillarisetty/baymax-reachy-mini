@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import hashlib
-import importlib
 import importlib.util
 import json
 import os
@@ -12,14 +11,19 @@ import wave
 from collections.abc import Callable
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 from urllib import request
 from urllib.error import URLError
 
 from ..config import default_data_dir
 from .download import DownloadError, DownloadManager
 
-tomllib = importlib.import_module("tomllib" if sys.version_info >= (3, 11) else "tomli")
+if TYPE_CHECKING:
+    tomllib: Any
+elif sys.version_info >= (3, 11):
+    import tomllib
+else:
+    import tomli as tomllib
 
 STT_MODEL_ID = "faster-whisper-small"
 TTS_MODEL_ID = "Piper en_US-lessac-medium"
@@ -38,6 +42,16 @@ TTS_URLS = (
     f"{HF_ROOT}/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx",
     f"{HF_ROOT}/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/en_US-lessac-medium.onnx.json",
 )
+
+
+def _default_manifest_path() -> Path:
+    source_path = Path("config/voice-models.toml")
+    if source_path.is_file():
+        return source_path
+    bundle_root = getattr(sys, "_MEIPASS", None)
+    if bundle_root:
+        return Path(bundle_root) / "config" / "voice-models.toml"
+    return source_path
 
 
 @dataclass(frozen=True)
@@ -86,7 +100,7 @@ class VoiceModelSetup:
         *,
         opener: Callable[..., Any] | None = None,
         free_space: Callable[[Path], int] | None = None,
-        manifest_path: Path = Path("config/voice-models.toml"),
+        manifest_path: Path | None = None,
         download_manager: DownloadManager | None = None,
     ):
         self.data_dir = (data_dir or default_data_dir()).resolve()
@@ -95,7 +109,7 @@ class VoiceModelSetup:
         self.tts_path = self.root / "piper" / "en_US-lessac-medium.onnx"
         self.config_path = self.root / "voice-config.json"
         self.progress_path = self.root / "progress.json"
-        self.manifest_path = manifest_path
+        self.manifest_path = manifest_path or _default_manifest_path()
         self._injected_opener = opener is not None
         self._open = opener or request.urlopen
         self.download_manager = download_manager or DownloadManager(

@@ -4,7 +4,7 @@ root = Path(SPECPATH).parents[1]
 a = Analysis(
     [str(root / "deploy" / "windows" / "entrypoint.py")],
     pathex=[str(root / "src")],
-    datas=[],
+    datas=[(str(root / "config" / "voice-models.toml"), "config")],
     hiddenimports=[],
     excludes=[],
 )

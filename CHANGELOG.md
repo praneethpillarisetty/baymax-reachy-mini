@@ -1,5 +1,10 @@
 # Changelog
 
+## Phase 7 CI packaging repair - 2026-08-11
+
+- Made TOML compatibility imports statically discoverable to PyInstaller and bundled the approved voice manifest in the Windows executable.
+- Fixed Ruff `RUF012` and import-order failures without disabling rules.
+
 ## 0.3.1 - 2026-08-06
 
 - Restored model adapters and the example profile that were accidentally excluded by an over-broad `models/` ignore rule.

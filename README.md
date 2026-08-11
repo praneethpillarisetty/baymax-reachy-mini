@@ -35,6 +35,8 @@ Windows PowerShell uses `py -m venv .venv; .\.venv\Scripts\Activate.ps1; py -m p
 
 Models are outside Git: `%LOCALAPPDATA%\BaymaxCompanion\models\voice\` on Windows and `~/.local/share/baymax-companion/models/voice/` on Linux. Inspect visible browser JSON and `<data-dir>/models/voice/progress.json`; export diagnostics before troubleshooting. To uninstall, stop Baymax and remove only the relevant directory below `models/voice`; never delete arbitrary paths. A failed checksum removes the unsafe partial; network interruption preserves it for Retry.
 
+The Windows executable bundles the approved voice manifest. Python 3.11+ uses the standard-library `tomllib`; Python 3.10 uses the declared `tomli` compatibility dependency, allowing PyInstaller to discover either import statically.
+
 Reachy Mini Lite is laptop-hosted and must use a verified official local/USB daemon flow. Reachy Mini Wireless is CM4-hosted and must use a verified official network flow; `reachy-mini.local` is only a discovery candidate, not robot identity proof. Until the SDK wrapper and real hardware pass supervised checks, use the simulator and run `baymax safe-stop`; no discovery/status command may move hardware.
 
 Configuration is read from `--config FILE`, optional `.env`, and then environment variables. Use `config/default.toml`, `config/laptop-ollama.toml`, or the deliberately inference-locked `config/standalone.toml`. Non-loopback Ollama URLs require explicit `BAYMAX_ALLOW_OLLAMA_LAN=true`. See [runtime modes](docs/runtime-modes.md).

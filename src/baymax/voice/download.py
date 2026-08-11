@@ -8,7 +8,7 @@ import threading
 import time
 from dataclasses import asdict, dataclass
 from pathlib import Path, PurePath, PureWindowsPath
-from typing import BinaryIO
+from typing import BinaryIO, ClassVar
 from urllib import request
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlparse
@@ -67,7 +67,7 @@ def safe_filename(name: str) -> str:
 class DownloadManager:
     """Bounded, resumable downloader with persisted progress and atomic completion."""
 
-    ACTIVE = {"downloading", "paused", "verifying"}
+    ACTIVE: ClassVar[set[str]] = {"downloading", "paused", "verifying"}
 
     def __init__(
         self,

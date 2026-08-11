@@ -13,7 +13,6 @@ from baymax.voice.download import (
     safe_filename,
 )
 
-
 PAYLOAD = b"fixture voice model"
 
 
