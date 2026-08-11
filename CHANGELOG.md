@@ -1,5 +1,10 @@
 # Changelog
 
+## Phase 7 CI packaging repair - 2026-08-11
+
+- Made TOML compatibility imports statically discoverable to PyInstaller and bundled the approved voice manifest in the Windows executable.
+- Fixed Ruff `RUF012` and import-order failures without disabling rules.
+
 ## 0.3.1 - 2026-08-06
 
 - Restored model adapters and the example profile that were accidentally excluded by an over-broad `models/` ignore rule.
@@ -22,3 +27,9 @@
 
 - Added simulator-first local companion architecture, safety, structured local tools, SQLite, model/audio/robot adapters, tests, benchmark skeleton, and deployment documentation.
 - Physical Reachy Mini and exact LiteRT candidates remain unverified due to source-network restrictions.
+
+## Phase 7 voice download repair - 2026-08-10
+
+- Added an authoritative voice manifest and application-data-only reusable DownloadManager.
+- Repaired confirmed browser install requests, visible JSON errors/progress, verification/activation gates, and separate voice controls.
+- Documented conservative Laptop, Reachy Lite, Wireless, and CM4 compatibility boundaries.

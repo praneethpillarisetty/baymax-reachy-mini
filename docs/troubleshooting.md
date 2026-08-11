@@ -12,3 +12,7 @@ publish a length. Unverified cards are intentionally blocked. Use `baymax models
 only after reviewing the active and previous configuration. No command deletes a model.
 
 For unexpected motion or daemon/audio loss, stop immediately using the official physical emergency procedure; do not improvise SDK calls. Reachy connection, media, simulator and deployment troubleshooting must use current Reachy Mini—not Reachy 2—documentation.
+
+## Voice download buttons
+
+The Install action requires JSON `Content-Type`, the manifest `model_id`, and `confirm: true`. Poll `/api/voice/progress`; failures include an error code, message, and recovery. Retry preserves valid partial data, while checksum failure deletes unsafe data. Confirm the destination is under the platform application-data `models/voice` directory and export voice diagnostics. Mock ASR and console TTS intentionally provide no real transcription or speech.

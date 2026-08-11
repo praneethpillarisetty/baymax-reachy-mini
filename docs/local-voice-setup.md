@@ -7,10 +7,13 @@ The setup dashboard installs the laptop defaults without enabling them:
 * TTS: **Piper en_US-lessac-medium**, from
   `https://huggingface.co/rhasspy/piper-voices/resolve/main/en/en_US/lessac/medium/`.
 
-The exact URLs used are exposed by `baymax.voice.setup.STT_URLS` and `TTS_URLS`.
-Hugging Face's SHA-256 LFS ETag is required and checked for every file. A response
-without a SHA-256 is rejected. Partial downloads use a Range request and remain
-available for Retry; a checksum mismatch is deleted.
+The authoritative allow-list is `config/voice-models.toml`; directory listings and
+browser-provided URLs are never download inputs. Manifest SHA-256 values are checked
+when published, and a valid 64-character Hugging Face SHA-256 ETag is also used when
+available. Missing upstream checksums do not make installation impossible: exact file
+names and URLs remain pinned and a local verification manifest is generated. Partial
+downloads use Range, fall back safely when the server returns 200, and remain for Retry;
+a checksum mismatch is deleted.
 
 ## Download destinations
 
@@ -18,9 +21,9 @@ No asset is written to the checkout. Under `BAYMAX_DATA_DIR` (by default
 `~/.local/share/baymax-companion` on Linux and `%LOCALAPPDATA%\BaymaxCompanion`
 on Windows), files are stored at:
 
-* `voice/faster-whisper-small/`
-* `voice/piper/en_US-lessac-medium.onnx`
-* `voice/piper/en_US-lessac-medium.onnx.json`
+* `models/voice/faster-whisper-small/`
+* `models/voice/piper/en_US-lessac-medium.onnx`
+* `models/voice/piper/en_US-lessac-medium.onnx.json`
 
 Install the Python `faster-whisper` runtime and a trusted Piper executable
 separately, then enter the Piper executable path in the dashboard. Press Verify
@@ -30,10 +33,10 @@ does not mutate the running process or silently switch providers:
 
 ```text
 BAYMAX_ASR_BACKEND=faster-whisper
-ASR_MODEL_PATH=<application-data>/voice/faster-whisper-small
+ASR_MODEL_PATH=<application-data>/models/voice/faster-whisper-small
 BAYMAX_TTS_BACKEND=piper
 TTS_EXECUTABLE=<configured-piper-executable>
-TTS_MODEL_PATH=<application-data>/voice/piper/en_US-lessac-medium.onnx
+TTS_MODEL_PATH=<application-data>/models/voice/piper/en_US-lessac-medium.onnx
 ```
 
 Microphone tests request browser permission and enumerate audio inputs. Speaker

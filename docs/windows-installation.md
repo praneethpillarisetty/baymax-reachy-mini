@@ -65,3 +65,9 @@ Restart the UI. **Play response** synthesizes a temporary WAV for browser playba
 playback only after a browser user gesture. To test the full loop: record, stop, inspect the
 transcript, select **Send transcript**, and play the attributed Ollama response. The robot
 remains the simulator and voice input never enables physical movement.
+
+## Phase 7 voice storage and recovery
+
+Voice downloads are stored under `%LOCALAPPDATA%\BaymaxCompanion\models\voice\`, never the checkout. Use the browser's visible error JSON and Retry to resume `.partial` files. Stop Baymax before uninstalling a model directory. Configure a Piper executable only after verifying it is a trusted Windows build with matching architecture.
+
+The PyInstaller specification bundles `config/voice-models.toml`. Python 3.11–3.13 resolve standard-library `tomllib`; Python 3.10 resolves the declared `tomli` dependency. The packaging smoke test must start the executable in mock mode without downloading any models.

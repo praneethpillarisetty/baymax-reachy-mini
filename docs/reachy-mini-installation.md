@@ -11,3 +11,7 @@ The adapter validates only the local choreography vocabulary (`greeting`, `liste
 The setup dashboard reports SDK discovery and the supervised checklist boundary only. It exposes no
 movement control and cannot activate physical mode. Model installation never changes the simulator
 robot default.
+
+## Phase 7 connection boundary
+
+Lite and Wireless are separate profiles. The production adapter must import `ReachyMini` from `reachy_mini` and use only connection modes confirmed by the installed official SDK. Auto/local/network discovery must not move hardware; host reachability is only a candidate signal. This checkout still fails closed because official API verification and physical hardware tests were unavailable.

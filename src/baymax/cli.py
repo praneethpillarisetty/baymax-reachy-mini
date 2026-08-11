@@ -3,6 +3,8 @@ from __future__ import annotations
 import argparse
 import io
 import json
+import platform
+import shutil
 import sys
 from contextlib import redirect_stdout
 from pathlib import Path
@@ -150,6 +152,27 @@ def parser() -> argparse.ArgumentParser:
     voice_test.add_argument(
         "component", choices=("microphone", "speaker", "asr", "tts", "end-to-end")
     )
+    setup = commands.add_parser("setup").add_subparsers(dest="setup_command", required=True)
+    setup_plan = setup.add_parser("plan")
+    setup_plan.add_argument(
+        "--target", choices=("laptop", "reachy-wireless", "reachy-lite"), required=True
+    )
+    setup.add_parser("status")
+    setup_export = setup.add_parser("export")
+    setup_export.add_argument("--output", type=Path, default=Path("baymax-setup-plan.json"))
+    robot_cli = commands.add_parser("robot").add_subparsers(dest="robot_command", required=True)
+    for name in ("discover", "status", "install-check", "sdk-check", "safe-stop"):
+        robot_cli.add_parser(name)
+    connect = robot_cli.add_parser("connect")
+    connect.add_argument(
+        "--mode", choices=("auto", "localhost_only", "network", "simulator"), required=True
+    )
+    install_sdk = robot_cli.add_parser("install-sdk")
+    install_sdk.add_argument("--target", choices=("laptop", "reachy"), required=True)
+    install_sdk.add_argument("--confirm", action="store_true")
+    deploy = robot_cli.add_parser("deploy")
+    deploy.add_argument("--target", choices=("wireless", "lite"), required=True)
+    deploy.add_argument("--confirm", action="store_true")
     return root
 
 
@@ -161,6 +184,87 @@ def main(argv: list[str] | None = None) -> int:
         print(f"Configuration error: {exc}", file=sys.stderr)
         return 2
     store = LocalStore(settings.database_path)
+    if args.command == "setup":
+        setup = VoiceModelSetup(settings.data_dir)
+        report = {
+            "target": getattr(args, "target", "laptop"),
+            "installed": {"stt": setup.stt_path.exists(), "tts": setup.tts_path.exists()},
+            "downloads": [setup.describe("stt"), setup.describe("tts")],
+            "requires_confirmation": True,
+            "cannot_test_without_hardware": [
+                "microphone",
+                "speaker",
+                "Reachy connection and motion",
+            ],
+            "rollback": f"Stop Baymax and remove selected directories below {setup.root}",
+        }
+        if getattr(args, "target", "laptop") == "reachy-wireless":
+            report["downloads"] = []
+            report["blocked"] = (
+                "CM4 voice models and qwen3:4b are not approved for automatic installation."
+            )
+        if args.setup_command == "status":
+            print(
+                json.dumps(
+                    {"voice": setup.progress(), "data_dir": str(settings.data_dir)}, indent=2
+                )
+            )
+        elif args.setup_command == "export":
+            args.output.write_text(json.dumps(report, indent=2), encoding="utf-8")
+            print(f"Redacted setup plan exported to {args.output}")
+        else:
+            print(json.dumps(report, indent=2))
+        return 0
+    if args.command == "robot":
+        status = ReachyMiniRobot().status()
+        base: dict[str, object] = {
+            "candidate_type": "none verified",
+            "transport": "none",
+            "hostname_or_ip": "redacted/not configured",
+            "sdk_version": ReachyMiniRobot.sdk_version(),
+            "daemon_status": "not probed without a verified SDK connection",
+            "connection_result": "not connected",
+            "safety_status": "motion disabled",
+            "next_action": "Install/review the official SDK, verify its API, then run a supervised smoke test.",
+        }
+        if args.robot_command in {"discover", "status", "sdk-check"}:
+            print(
+                json.dumps(
+                    base | ({"adapter": status} if args.robot_command == "status" else {}), indent=2
+                )
+            )
+            return 0
+        if args.robot_command == "install-check":
+            base.update(
+                python=sys.version.split()[0],
+                operating_system=platform.system(),
+                architecture=platform.machine(),
+                uv_available=shutil.which("uv") is not None,
+                sdk_installed=ReachyMiniRobot.sdk_available(),
+                supported_install_command="uv venv .venv && uv pip install reachy-mini (review current official docs/version first)",
+            )
+            print(json.dumps(base, indent=2))
+            return 0
+        if args.robot_command == "safe-stop":
+            ReachyMiniRobot().stop_motion()
+            print("Safe stop engaged; physical movement remains disabled.")
+            return 0
+        if args.robot_command in {"install-sdk", "deploy"}:
+            if not args.confirm:
+                print("Refusing changes without --confirm", file=sys.stderr)
+                return 2
+            print(
+                "Confirmed request recorded as a dry-run; follow the reviewed official manual path."
+            )
+            return 0
+        print(
+            json.dumps(
+                base
+                | {"requested_mode": args.mode, "result": "fail-closed; no verified SDK wrapper"},
+                indent=2,
+            )
+        )
+        return 1
     if args.command == "doctor":
         checks = run_doctor(settings)
         print(format_checks(checks, args.json))

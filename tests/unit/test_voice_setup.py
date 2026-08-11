@@ -1,5 +1,6 @@
 import hashlib
 import json
+import sys
 from pathlib import Path
 from urllib.error import URLError
 
@@ -37,6 +38,18 @@ def test_no_voice_model_installed(tmp_path: Path):
     assert not setup.stt_path.exists()
     assert setup.verify("stt") is False
     assert setup.progress()["stage"] == "failed"
+
+
+def test_packaged_manifest_path_is_discoverable(tmp_path: Path, monkeypatch):
+    bundle = tmp_path / "bundle"
+    manifest = bundle / "config" / "voice-models.toml"
+    manifest.parent.mkdir(parents=True)
+    manifest.write_text("manifest_version = 1\nmodels = []\n", encoding="utf-8")
+    working = tmp_path / "working"
+    working.mkdir()
+    monkeypatch.chdir(working)
+    monkeypatch.setattr(sys, "_MEIPASS", str(bundle), raising=False)
+    assert VoiceModelSetup(tmp_path / "data").manifest_path == manifest
 
 
 def test_model_download_and_verification(tmp_path: Path, monkeypatch):
